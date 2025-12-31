@@ -1,35 +1,39 @@
-# C64 Pinyin IME (GB2312, 2501 Glyphs)
+# C64 GB2312 Text Renderer (han64)
 
-A Mandarin Pinyin Input Method Editor for the Commodore 64, using a compact 7×7 bitmap font and GB2312-compatible encoding.
+A GB2312 Chinese text renderer for the Commodore 64, using 8×8 bitmap fonts with dynamic character caching.
 
-This project deliberately separates linguistic logic (pinyin) from encoding (GB2312) and rendering (glyphID) to keep the runtime simple, fast, and 6502-friendly.
+## Scope (v1 - Current: Rendering)
 
-## Scope (v1)
-
-- 2501 Simplified Chinese characters
-- 7×7 pixel bitmap font (7 bits per row, 7 bytes per glyph)
-- Pinyin → single-character input (no dictionary / phrases yet)
-- GB2312-compatible I/O
-- ASCII + Hanzi text streams
+- 2501 Simplified Chinese characters (GB2312 rows $B0-$D7)
+- 8×8 pixel bitmap font (8 bytes per glyph)
+- GB2312-encoded text display from binary files
+- Dynamic character caching (256 character slots)
+- Rank-based GB2312 → glyphID lookup
 - Offline table generation in Python
-- Runtime lookup on C64 in 6502 assembly
+- Runtime rendering on C64 in 6502 assembly (ACME)
 
-## Core Architecture
+## Scope (v2 - Future: IME)
+
+- Pinyin input method with candidate selection
+- Interactive text editing
+- Cursor movement and scrolling
+- Dual charset support (512 character slots)
+- See "Future Work" section below
+
+## Core Architecture (v1)
 
 ```
-Keyboard
+GB2312 text file (chabuduo.bin)
   ↓
-Pinyin parsing
+GB2312 → glyphID lookup (rank-based tables)
   ↓
-Initial / Ø bucket
+Cache check (2502-byte cache array)
   ↓
-SyllableID
+Copy glyph bitmap (8×8) if not cached
   ↓
-Candidate glyphIDs
+Write character code to screen RAM
   ↓
-Glyph bitmap (7×7)
-  ↓
-Screen
+VIC-II renders using custom charset
 ```
 
 ### Key Principles
@@ -38,6 +42,7 @@ Screen
 - Dense internal glyphID (0..2500)
 - GB2312 used only for I/O
 - All heavy processing offline
+- Self-modifying code for fast glyph copies
 
 ## Glyph Set
 
@@ -55,12 +60,12 @@ All are:
 
 ### Glyph Storage
 
-**font.bin**
+**font8.bin**
 
 Layout:
 
-- glyphID × 7 bytes
-- 1 byte per row, 7 bits used
+- glyphID × 8 bytes
+- 1 byte per row, 8 bits used (8×8 bitmap)
 
 ## glyphID Ordering (Important)
 
@@ -77,134 +82,83 @@ Frequency is handled inside IME candidate ordering, not glyphID numbering.
 
 ## Encoding: GB2312
 
-- **ASCII:** `0x00–0x7F`
+- **ASCII:** `0x00–0x7F` (currently skipped in v1)
 - **Hanzi:** 2 bytes
-  - lead: `0xA1–0xF7`
-  - trail: `0xA1–0xFE`
-- **Unused / invalid:** `0x80–0xA0`, `0xF8–0xFF`
+  - hi byte (row): `0xB0–0xD7` (40 rows supported)
+  - lo byte (col): `0xA1–0xFE` (94 columns per row)
+- **Unused / invalid:** Other byte ranges
 - No BOM
 - Stateless, streaming-friendly
 
 GB2312 is strictly an I/O format, not used for internal logic.
 
-## Pinyin Model
+### GB2312 Lookup Implementation
 
-### Initial Buckets (24)
+The runtime uses a **rank-based encoding** to compress the GB2312 → glyphID mapping:
 
-Canonical Hanyu Pinyin initials + Ø:
+Each row ($B0-$D7) has a table with:
 
-```
-Ø
-b p m f
-d t n l
-g k h
-j q x
-zh ch sh r
-z c s
-y w
-```
+- **Base glyphID** (2 bytes): Starting glyphID for this row
+- **Rank array** (94 bytes): For each column ($A1-$FE), stores rank (0..count-1) or $FF if missing
 
-- zh/ch/sh are atomic initials
-- z ≠ zh, s ≠ sh, etc.
-- Ø = vowel-initial syllables
+This allows missing characters to be represented efficiently without allocating glyphIDs for unused GB2312 codes.
 
-### Vowel-Initial Handling
+## Runtime Tables (v1)
 
-- Typing a vowel enters Ø bucket implicitly
-- Apostrophe `'` forces Ø explicitly
-- Matches real pinyin segmentation (xi'an)
+Generated offline via Python (`tools/gb40.py`).
 
-### No Jianpin (yet)
+### gb40_rows.asm
 
-- AQ → 安全 style abbreviation is not in v1
-- Will be a separate phrase/dictionary layer later
-
-## IME Tables (Binary)
-
-Generated offline via Python.
-
-### 1. glyph_gb2312.bin
-
-**glyphID → GB2312 code (u16 LE)**
-
-- Size: 2501 × 2 bytes
-
-### 2. Syllable Tables (Level 1)
-
-**syll_blob.bin**
+Contains 40 row tables (`gb_row_B0` through `gb_row_D7`), each with:
 
 ```
-[len][ascii bytes][len][ascii bytes]...
+!word baseGlyphID       ; 2 bytes
+!byte rank[94]          ; 94 bytes: rank or $FF if missing
 ```
 
-**syll_ptr.bin**
+Referenced by pointer tables `gb_row_ptr_lo` and `gb_row_ptr_hi` in main.asm.
 
-```
-syllableID → offset into blob (u16)
-```
+## Character Cache
 
-**bucket.bin**
+**cache** (2502 bytes in main.asm)
 
-```
-24 entries:
-  [startID u16][count u16]
-```
+- Indexed by glyphID (0..2501)
+- Stores character slot (0-255) if glyph is loaded, or 0 if not cached
+- When cache fills (chrptr reaches 256), subsequent characters show as space
 
-Syllables are sorted by (bucket, lexical) so each bucket is contiguous.
-
-### 3. Pinyin → Characters (Level 2)
-
-- syllableID → offset into py_idx (u16)
-- syllableID → candidate count (u8)
-- concatenated glyphID lists (u16 each)
-- Candidates are initially sorted by GB2312 order for easy I/O
-- Frequency sorting can be applied later
-
-## Frequency Data (Optional, Recommended)
-
-- Used to improve candidate ordering
-- Applied offline
-- Syllable candidates sorted by frequency rank
-
-**Good sources:**
-
-- SUBTLEX-CH (spoken / modern)
-- Jun Da frequency list
-
-## Unihan Source (Pinyin Data)
-
-Authoritative pinyin mappings come from Unicode Unihan Database: `Unihan_Readings.txt` https://www.unicode.org/Public/UCD/latest/ucd/Unihan.zip
-
-**Fields used:**
-
-- `kMandarin` (baseline)
-- tones stripped
-- ü normalized to v
+This limits visible unique characters to 256 at once, but allows documents with 2501+ total characters through caching.
 
 ## Python Build Pipeline
 
 **Inputs:**
 
-- `chars.txt` (2501 Hanzi)
-- `Unihan_Readings.txt`
+- `gb2312_chars.txt` (2501 Hanzi with GB2312 codes)
+- Font bitmap data (8×8 bitmaps)
 
-All tables are included verbatim in assembly using `!binary`.
+**Outputs:**
+
+- `font8.bin` (2501 × 8 bytes)
+- `gb40_rows.asm` (40 row tables with rank encoding)
+
+All tables are included in assembly using `!binary` and `!source`.
 
 ## Runtime (C64 / 6502)
 
 - No UTF-8
-- No Unicode
+- No Unicode at runtime
 - No dynamic memory
 - All tables are read-only
-- Use a modern cross-assembler: cc65
+- Assembler: ACME
+- Build: `acme main.asm` (or see Makefile)
 
-**Lookup path:**
+**Rendering path (v1):**
 
-1. Parse input → initial/Ø
-2. Get bucket range
-3. Binary search syllable
-4. Fetch candidate glyphIDs
-5. Render font bitmap
+1. Read GB2312 byte pair from text stream
+2. Lookup glyphID via `GB2312_LookupGlyphID` (rank-based)
+3. Check cache array indexed by glyphID
+4. If not cached, copy 8×8 bitmap via `CopyGlyph8` to custom charset
+5. Write character slot to screen RAM
+6. VIC-II displays using custom charset at $3000
 
 ## What This Is Not
 
@@ -214,12 +168,34 @@ All tables are included verbatim in assembly using `!binary`.
 - Not Traditional Chinese
 - Not GBK/GB18030 runtime (but compatible offline)
 
-## Future Work
+## Future Work (v2 - IME)
 
+### Pinyin IME Features
+
+- Pinyin input method with syllable parsing
+- Initial buckets (b, p, m, f, d, t, n, l, etc. + Ø for vowel-initial)
+- Candidate selection UI
 - Phrase dictionary (2–4 chars)
-- Jianpin mode
+- Jianpin abbreviation mode
 - MRU learning
-- UTF-8 import/export
+- Frequency-based candidate ordering
+
+### Enhanced Rendering
+
+- Dual charset support (512 character slots via raster IRQ)
+  - Charset1 for top half of screen
+  - Charset2 for bottom half
+  - Raster IRQ at row 13 (scanline 104) to switch
+  - Second IRQ at row 25 (scanline 200) to switch back
+- Scrolling support (row copy + IRQ adjustment)
+- Cursor movement (color-based or dedicated glyph)
+- Interactive text editing
+
+### Data Sources
+
+- Unihan Database for pinyin mappings
+- SUBTLEX-CH or Jun Da for frequency data
+- UTF-8 import/export tools
 
 ## Design Philosophy
 
@@ -228,15 +204,19 @@ All tables are included verbatim in assembly using `!binary`.
 - Encoding ≠ language
 - 6502 first, modern tooling second
 
-## Text Rendering
+## Text Rendering (v1)
 
-- Text mode with custom charset(s)
+- VIC-II text mode with custom charset
 - 40×25 characters
+- Custom charset at $3000 (bank 6)
+- Screen RAM at $0400
+- Color RAM at $D800 (currently set to light gray $0F)
+- Character limit: 256 unique glyphs on screen at once
 
-## IME Rendering
+## IME Rendering (v2 - Future)
 
-- Top line is IME input and candidate area
+- Top line: IME input and candidate area
 - Show max 10 candidates: `ying 1英 2婴 3鹰 4应 5营 6蝇 7迎 8赢 9盈 0影`
-- Need next/prev page markers if >10 candidates
-- Lower lines are normal text view area
+- Next/prev page markers if >10 candidates
+- Lower 24 lines: normal text view area
 - Cursor moves in text area, not IME area
