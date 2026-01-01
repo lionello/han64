@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+import argparse
+import sys
 from pathlib import Path
 
 from PIL import Image
@@ -65,14 +67,19 @@ def extract_glyph(img: Image.Image, tile_r: int, tile_c: int) -> tuple[bytes, by
     return glyph7, glyph8
 
 def main():
-    img = Image.open(SHEET_PNG).convert("RGBA")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("image", nargs="?", help="input sprite sheet PNG file", default=SHEET_PNG)
+    parser.add_argument("tilemap", nargs="?", help="input tilemap TXT file", default=TILEMAP_TXT)
+    args = parser.parse_args()
+
+    img = Image.open(args.image).convert("RGBA")
     w, h = img.size
     cols = w // TILE_W
     rows = h // TILE_H
     if cols * TILE_W != w or rows * TILE_H != h:
         raise ValueError(f"image size {w}x{h} not divisible by {TILE_W}x{TILE_H}")
 
-    pos = load_tilemap(TILEMAP_TXT)
+    pos = load_tilemap(args.tilemap)
 
     # You want output in your glyphID order.
     # For now: sort by GB2312 bytes (matches earlier plan).

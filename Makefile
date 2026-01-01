@@ -8,7 +8,7 @@ SRC    := main.asm
 
 all: $(TARGET)
 
-$(TARGET): $(SRC) chabuduo.bin
+$(TARGET): $(SRC) chabuduo.bin gb40_rows.asm font8.bin
 	$(ACME) -f cbm -o $@ $<
 
 run: $(TARGET)
@@ -19,3 +19,9 @@ clean:
 
 chabuduo.bin: tools/chabuduo.txt
 	iconv -f UTF-8 -t gb2312 < $< > $@
+
+gb40_rows.asm: gb2312_chars.txt
+	tools/gb40.py $@
+
+font8.bin font7.bin gb2312_chars.txt: tools/sheet.png tools/tilemap.txt
+	tools/conv.py $+
