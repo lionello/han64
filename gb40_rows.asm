@@ -2,11 +2,11 @@
 ; Input: raw GB2312-encoded text files
 
 ; ------------------------------------------------------------
-; Sparse character lookup table (codes outside $B0-$D7)
+; Sparse character entries (rows > $D7, appended to gb_sparse_table)
 ; Format: [hi, lo, glyphID_lo, glyphID_hi] * N, terminated by $00
 ; ------------------------------------------------------------
 
-gb_sparse_table:
+gb_sparse_append:
     !byte $E3,$B6  ; GB2312 code
     !word $09C1      ; glyphID 2497
     !byte $E8,$EB  ; GB2312 code
@@ -27,7 +27,8 @@ gb_sparse_table:
     !word $09C9      ; glyphID 2505
     !byte 0  ; end of table
 
-; Total sparse character entries: 9
+; Generated sparse entries (rows > $D7): 9
+; (Manual entries in main.asm handle rows < $B0)
 
 ; ------------------------------------------------------------
 ; GB2312 row matrices for hi=$B0..$D7

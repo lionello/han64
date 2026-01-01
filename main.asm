@@ -173,21 +173,6 @@ dst_lo = dst+1
 dst_hi = dst+2
 
 ; ------------------------------------------------------------
-; Punctuation lookup table (4 entries)
-; ------------------------------------------------------------
-
-punctuation:
-	!byte $A1,$A3  ; 。(period)
-	!word 1     ; glyphID (TODO: set actual IDs)
-	!byte $A3,$A1  ; ！(exclamation mark)
-	!word 2
-	!byte $A3,$AC  ; ，(comma)
-	!word 3
-	!byte $A3,$BF  ; ？(question mark)
-	!word 4
-	!byte 0 ; end of table
-
-; ------------------------------------------------------------
 ; GB2312 -> glyphID lookup
 ; Handles:
 ;   - Hanzi rows $B0..$D7 (rank-based, checked first)
@@ -255,7 +240,7 @@ GB2312_LookupGlyphID:
 	sta tmp1		; save row byte
 	ldy #0
 .sparse_loop:
-	lda punctuation,y
+	lda gb_sparse_table,y
 	beq .miss		; end of table, not found
 	iny
 	iny
@@ -264,11 +249,11 @@ GB2312_LookupGlyphID:
 	cmp tmp1		; compare row
 	bne .sparse_loop
 	txa
-	cmp punctuation+1-4,y	; compare column
+	cmp gb_sparse_table+1-4,y	; compare column
 	bne .sparse_loop
-	lda punctuation+3-4,y	; glyphID hi
+	lda gb_sparse_table+3-4,y	; glyphID hi
 	tax
-	lda punctuation+2-4,y	; glyphID lo
+	lda gb_sparse_table+2-4,y	; glyphID lo
 	sec			; found
 	rts
 
@@ -342,4 +327,20 @@ FONT8_BASE	!byte 0,0,0,0,0,0,0,0	; 0=space
 		!byte %00000000
 		!binary "font8.bin"	; 5..2505
 
+; ------------------------------------------------------------
+; Sparse character lookup table
+; - Manual entries (rows < $B0): not in tilemap, defined here
+; - Generated entries (rows > $D7): appended from gb40_rows.asm
+; ------------------------------------------------------------
+
+gb_sparse_table:
+	!byte $A1,$A3  ; 。(period)
+	!word 1
+	!byte $A3,$A1  ; ！(exclamation mark)
+	!word 2
+	!byte $A3,$AC  ; ，(comma)
+	!word 3
+	!byte $A3,$BF  ; ？(question mark)
+	!word 4
+	; Generated entries appended here, terminated by $00
 !source "gb40_rows.asm"

@@ -84,14 +84,14 @@ def emit_asm(rows: dict[int,tuple], sparse_codes: list, out_path: str):
     lines.append("; Input: raw GB2312-encoded text files")
     lines.append("")
 
-    # Emit sparse character table if any
+    # Emit sparse character table entries (appended to manual table in main.asm)
     if sparse_codes:
         lines.append("; ------------------------------------------------------------")
-        lines.append("; Sparse character lookup table (codes outside $B0-$D7)")
+        lines.append("; Sparse character entries (rows > $D7, appended to gb_sparse_table)")
         lines.append("; Format: [hi, lo, glyphID_lo, glyphID_hi] * N, terminated by $00")
         lines.append("; ------------------------------------------------------------")
         lines.append("")
-        lines.append("gb_sparse_table:")
+        lines.append("gb_sparse_append:")
         for hi, lo, gid in sparse_codes:
             gid_lo = gid & 0xFF
             gid_hi = (gid >> 8) & 0xFF
@@ -99,7 +99,8 @@ def emit_asm(rows: dict[int,tuple], sparse_codes: list, out_path: str):
             lines.append(f"    !word ${gid:04X}      ; glyphID {gid}")
         lines.append("    !byte 0  ; end of table")
         lines.append("")
-        lines.append(f"; Total sparse character entries: {len(sparse_codes)}")
+        lines.append(f"; Generated sparse entries (rows > $D7): {len(sparse_codes)}")
+        lines.append(f"; (Manual entries in main.asm handle rows < $B0)")
         lines.append("")
 
     # Emit row matrices for $B0-$D7
