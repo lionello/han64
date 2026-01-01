@@ -1,12 +1,44 @@
-; Auto-generated GB2312 row matrices for hi=$B0..$D7
+; Auto-generated GB2312 lookup tables
 ; Input: raw GB2312-encoded text files
+
+; ------------------------------------------------------------
+; Sparse character lookup table (codes outside $B0-$D7)
+; Format: [hi, lo, glyphID_lo, glyphID_hi] * N, terminated by $00
+; ------------------------------------------------------------
+
+gb_sparse_table:
+    !byte $E3,$B6  ; GB2312 code
+    !word $09C1      ; glyphID 2497
+    !byte $E8,$EB  ; GB2312 code
+    !word $09C2      ; glyphID 2498
+    !byte $E9,$D9  ; GB2312 code
+    !word $09C3      ; glyphID 2499
+    !byte $F2,$BE  ; GB2312 code
+    !word $09C4      ; glyphID 2500
+    !byte $F2,$C7  ; GB2312 code
+    !word $09C5      ; glyphID 2501
+    !byte $F2,$D1  ; GB2312 code
+    !word $09C6      ; glyphID 2502
+    !byte $F2,$F0  ; GB2312 code
+    !word $09C7      ; glyphID 2503
+    !byte $F2,$F9  ; GB2312 code
+    !word $09C8      ; glyphID 2504
+    !byte $F6,$F9  ; GB2312 code
+    !word $09C9      ; glyphID 2505
+    !byte 0  ; end of table
+
+; Total sparse character entries: 9
+
+; ------------------------------------------------------------
+; GB2312 row matrices for hi=$B0..$D7
 ; Layout per row: .word baseGlyphID, then 94 bytes (rank 0..count-1) or $FF=missing
 ; glyphID = baseGlyphID + rank
 ; Missing sentinel = $FF (rank must stay < $80 so BMI can detect missing)
+; ------------------------------------------------------------
 
 ; row hi=$B0 entries=61
 gb_row_B0:
-    !byte $01,$00
+    !byte $05,$00
     !byte $00,$01,$02,$03,$04,$05,$06,$FF,$07,$FF,$08,$09,$0A,$0B,$FF,$FF
     !byte $0C,$0D,$0E,$0F,$10,$11,$FF,$12,$FF,$13,$FF,$14,$FF,$15,$FF,$FF
     !byte $16,$17,$FF,$18,$FF,$FF,$FF,$19,$1A,$FF,$1B,$FF,$1C,$1D,$FF,$FF
@@ -16,7 +48,7 @@ gb_row_B0:
 
 ; row hi=$B1 entries=58
 gb_row_B1:
-    !byte $3E,$00
+    !byte $42,$00
     !byte $00,$FF,$01,$02,$03,$04,$05,$06,$07,$08,$FF,$09,$0A,$0B,$0C,$0D
     !byte $0E,$0F,$10,$11,$FF,$12,$FF,$13,$FF,$FF,$14,$15,$FF,$16,$FF,$17
     !byte $FF,$FF,$FF,$FF,$FF,$18,$19,$1A,$FF,$1B,$1C,$1D,$FF,$1E,$1F,$FF
@@ -26,7 +58,7 @@ gb_row_B1:
 
 ; row hi=$B2 entries=64
 gb_row_B2:
-    !byte $78,$00
+    !byte $7C,$00
     !byte $00,$01,$02,$FF,$03,$04,$FF,$05,$06,$07,$08,$FF,$FF,$09,$FF,$FF
     !byte $0A,$0B,$FF,$0C,$0D,$0E,$0F,$FF,$10,$FF,$11,$12,$13,$FF,$14,$FF
     !byte $15,$16,$17,$18,$19,$1A,$FF,$1B,$1C,$1D,$1E,$1F,$20,$21,$22,$23
@@ -36,7 +68,7 @@ gb_row_B2:
 
 ; row hi=$B3 entries=68
 gb_row_B3:
-    !byte $B8,$00
+    !byte $BC,$00
     !byte $00,$01,$02,$03,$04,$05,$06,$FF,$07,$08,$09,$0A,$0B,$FF,$0C,$FF
     !byte $0D,$0E,$0F,$10,$11,$12,$13,$FF,$14,$FF,$FF,$15,$FF,$16,$17,$FF
     !byte $18,$19,$1A,$1B,$1C,$1D,$1E,$1F,$20,$21,$22,$23,$24,$FF,$25,$26
@@ -46,7 +78,7 @@ gb_row_B3:
 
 ; row hi=$B4 entries=58
 gb_row_B4:
-    !byte $FC,$00
+    !byte $00,$01
     !byte $00,$01,$FF,$FF,$02,$03,$FF,$04,$05,$FF,$06,$07,$08,$09,$FF,$0A
     !byte $FF,$0B,$0C,$0D,$0E,$FF,$FF,$0F,$10,$11,$FF,$12,$13,$FF,$14,$FF
     !byte $FF,$FF,$FF,$FF,$15,$16,$17,$18,$19,$1A,$1B,$1C,$FF,$1D,$1E,$1F
@@ -56,7 +88,7 @@ gb_row_B4:
 
 ; row hi=$B5 entries=63
 gb_row_B5:
-    !byte $36,$01
+    !byte $3A,$01
     !byte $FF,$FF,$00,$01,$02,$FF,$FF,$03,$04,$05,$06,$FF,$07,$08,$09,$0A
     !byte $0B,$0C,$0D,$0E,$FF,$0F,$FF,$10,$11,$12,$FF,$13,$14,$15,$FF,$16
     !byte $17,$18,$19,$1A,$FF,$1B,$1C,$1D,$1E,$1F,$20,$21,$22,$23,$24,$25
@@ -66,7 +98,7 @@ gb_row_B5:
 
 ; row hi=$B6 entries=57
 gb_row_B6:
-    !byte $75,$01
+    !byte $79,$01
     !byte $00,$01,$02,$03,$04,$FF,$FF,$05,$06,$07,$08,$09,$FF,$0A,$0B,$FF
     !byte $FF,$FF,$0C,$0D,$FF,$0E,$0F,$10,$11,$FF,$FF,$12,$13,$14,$FF,$15
     !byte $16,$17,$FF,$18,$19,$FF,$1A,$1B,$1C,$FF,$1D,$1E,$1F,$20,$21,$FF
@@ -76,7 +108,7 @@ gb_row_B6:
 
 ; row hi=$B7 entries=72
 gb_row_B7:
-    !byte $AE,$01
+    !byte $B2,$01
     !byte $FF,$00,$01,$FF,$02,$03,$04,$05,$FF,$FF,$06,$07,$08,$FF,$FF,$FF
     !byte $09,$0A,$0B,$0C,$0D,$0E,$0F,$10,$11,$12,$13,$14,$15,$16,$17,$18
     !byte $19,$1A,$1B,$1C,$1D,$1E,$1F,$20,$21,$22,$FF,$FF,$FF,$23,$24,$25
@@ -86,7 +118,7 @@ gb_row_B7:
 
 ; row hi=$B8 entries=61
 gb_row_B8:
-    !byte $F6,$01
+    !byte $FA,$01
     !byte $00,$FF,$01,$FF,$02,$FF,$03,$04,$FF,$FF,$FF,$FF,$FF,$05,$06,$07
     !byte $08,$09,$0A,$0B,$0C,$0D,$FF,$0E,$0F,$10,$11,$FF,$12,$13,$FF,$FF
     !byte $FF,$FF,$14,$15,$16,$17,$18,$19,$1A,$1B,$1C,$FF,$FF,$1D,$1E,$1F
@@ -96,7 +128,7 @@ gb_row_B8:
 
 ; row hi=$B9 entries=67
 gb_row_B9:
-    !byte $33,$02
+    !byte $37,$02
     !byte $FF,$FF,$FF,$00,$01,$02,$03,$FF,$04,$FF,$05,$06,$07,$08,$FF,$09
     !byte $0A,$0B,$0C,$0D,$0E,$FF,$0F,$FF,$10,$11,$12,$FF,$13,$14,$FF,$15
     !byte $FF,$16,$17,$18,$19,$FF,$1A,$1B,$1C,$1D,$1E,$1F,$FF,$20,$21,$FF
@@ -106,7 +138,7 @@ gb_row_B9:
 
 ; row hi=$BA entries=67
 gb_row_BA:
-    !byte $76,$02
+    !byte $7A,$02
     !byte $FF,$00,$01,$FF,$FF,$02,$FF,$FF,$FF,$FF,$03,$04,$FF,$05,$06,$07
     !byte $08,$FF,$FF,$FF,$09,$FF,$FF,$FF,$0A,$0B,$FF,$0C,$0D,$FF,$FF,$0E
     !byte $0F,$FF,$10,$11,$12,$13,$14,$15,$16,$FF,$17,$FF,$18,$19,$1A,$1B
@@ -116,7 +148,7 @@ gb_row_BA:
 
 ; row hi=$BB entries=61
 gb_row_BB:
-    !byte $B9,$02
+    !byte $BD,$02
     !byte $FF,$00,$FF,$01,$02,$FF,$03,$04,$05,$06,$FF,$07,$08,$09,$0A,$0B
     !byte $FF,$FF,$0C,$0D,$0E,$0F,$10,$FF,$11,$12,$13,$14,$15,$FF,$FF,$FF
     !byte $FF,$FF,$16,$17,$18,$19,$FF,$FF,$FF,$1A,$FF,$FF,$1B,$1C,$FF,$FF
@@ -126,7 +158,7 @@ gb_row_BB:
 
 ; row hi=$BC entries=65
 gb_row_BC:
-    !byte $F6,$02
+    !byte $FA,$02
     !byte $00,$01,$02,$03,$FF,$04,$FF,$05,$FF,$06,$07,$FF,$08,$09,$0A,$0B
     !byte $0C,$0D,$FF,$0E,$FF,$0F,$10,$11,$12,$13,$FF,$14,$FF,$15,$FF,$FF
     !byte $16,$FF,$17,$18,$19,$1A,$1B,$1C,$1D,$1E,$FF,$1F,$20,$21,$FF,$22
@@ -136,7 +168,7 @@ gb_row_BC:
 
 ; row hi=$BD entries=66
 gb_row_BD:
-    !byte $37,$03
+    !byte $3B,$03
     !byte $00,$01,$02,$FF,$03,$FF,$FF,$04,$05,$06,$07,$08,$09,$0A,$0B,$FF
     !byte $0C,$0D,$0E,$FF,$0F,$FF,$FF,$10,$11,$12,$13,$14,$15,$16,$17,$18
     !byte $19,$FF,$FF,$FF,$1A,$FF,$1B,$FF,$FF,$FF,$FF,$1C,$FF,$1D,$1E,$1F
@@ -146,7 +178,7 @@ gb_row_BD:
 
 ; row hi=$BE entries=57
 gb_row_BE:
-    !byte $79,$03
+    !byte $7D,$03
     !byte $00,$01,$FF,$FF,$02,$03,$04,$05,$06,$07,$08,$FF,$09,$0A,$0B,$0C
     !byte $0D,$0E,$0F,$10,$11,$12,$FF,$FF,$13,$14,$15,$FF,$FF,$FF,$16,$17
     !byte $FF,$FF,$18,$FF,$19,$1A,$FF,$1B,$1C,$FF,$1D,$FF,$1E,$FF,$FF,$FF
@@ -156,7 +188,7 @@ gb_row_BE:
 
 ; row hi=$BF entries=51
 gb_row_BF:
-    !byte $B2,$03
+    !byte $B6,$03
     !byte $00,$FF,$FF,$FF,$FF,$FF,$FF,$01,$FF,$02,$FF,$FF,$03,$04,$05,$06
     !byte $FF,$FF,$07,$08,$09,$FF,$FF,$FF,$0A,$FF,$0B,$0C,$FF,$0D,$0E,$FF
     !byte $FF,$FF,$0F,$FF,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$1A,$FF
@@ -166,7 +198,7 @@ gb_row_BF:
 
 ; row hi=$C0 entries=60
 gb_row_C0:
-    !byte $E5,$03
+    !byte $E9,$03
     !byte $FF,$00,$01,$FF,$02,$FF,$03,$04,$05,$FF,$06,$07,$08,$09,$0A,$0B
     !byte $0C,$0D,$0E,$0F,$10,$11,$FF,$12,$13,$14,$FF,$15,$FF,$FF,$FF,$16
     !byte $17,$FF,$18,$19,$FF,$FF,$1A,$1B,$1C,$1D,$1E,$1F,$20,$21,$22,$FF
@@ -176,7 +208,7 @@ gb_row_C0:
 
 ; row hi=$C1 entries=64
 gb_row_C1:
-    !byte $21,$04
+    !byte $25,$04
     !byte $FF,$00,$01,$FF,$02,$03,$04,$05,$06,$07,$08,$09,$FF,$0A,$0B,$FF
     !byte $0C,$FF,$0D,$0E,$0F,$10,$11,$12,$13,$14,$FF,$15,$16,$17,$18,$FF
     !byte $19,$FF,$FF,$1A,$1B,$1C,$FF,$FF,$1D,$FF,$1E,$FF,$FF,$FF,$1F,$20
@@ -186,7 +218,7 @@ gb_row_C1:
 
 ; row hi=$C2 entries=61
 gb_row_C2:
-    !byte $61,$04
+    !byte $65,$04
     !byte $00,$01,$02,$FF,$03,$FF,$FF,$FF,$04,$FF,$05,$06,$FF,$FF,$07,$FF
     !byte $FF,$FF,$08,$FF,$09,$0A,$0B,$FF,$0C,$FF,$FF,$0D,$0E,$FF,$0F,$FF
     !byte $10,$FF,$11,$12,$FF,$FF,$13,$14,$15,$16,$17,$18,$FF,$FF,$FF,$FF
@@ -196,7 +228,7 @@ gb_row_C2:
 
 ; row hi=$C3 entries=62
 gb_row_C3:
-    !byte $9E,$04
+    !byte $A2,$04
     !byte $FF,$00,$01,$02,$FF,$03,$FF,$04,$05,$FF,$06,$07,$FF,$08,$09,$0A
     !byte $0B,$0C,$0D,$0E,$0F,$10,$11,$FF,$12,$13,$14,$15,$16,$FF,$17,$18
     !byte $FF,$FF,$19,$FF,$1A,$1B,$1C,$1D,$1E,$FF,$1F,$FF,$20,$21,$22,$FF
@@ -206,7 +238,7 @@ gb_row_C3:
 
 ; row hi=$C4 entries=64
 gb_row_C4:
-    !byte $DC,$04
+    !byte $E0,$04
     !byte $FF,$00,$01,$02,$03,$04,$05,$06,$07,$08,$09,$0A,$0B,$0C,$FF,$0D
     !byte $0E,$FF,$0F,$10,$11,$12,$13,$14,$15,$FF,$16,$FF,$17,$18,$19,$FF
     !byte $1A,$1B,$1C,$1D,$FF,$1E,$1F,$20,$21,$FF,$22,$23,$24,$25,$26,$27
@@ -216,7 +248,7 @@ gb_row_C4:
 
 ; row hi=$C5 entries=52
 gb_row_C5:
-    !byte $1C,$05
+    !byte $20,$05
     !byte $FF,$FF,$00,$01,$FF,$02,$FF,$03,$04,$05,$06,$07,$08,$09,$0A,$FF
     !byte $FF,$0B,$FF,$FF,$0C,$0D,$0E,$FF,$FF,$FF,$FF,$0F,$FF,$FF,$FF,$10
     !byte $11,$12,$FF,$13,$14,$15,$FF,$FF,$16,$17,$FF,$18,$FF,$19,$FF,$1A
@@ -226,7 +258,7 @@ gb_row_C5:
 
 ; row hi=$C6 entries=64
 gb_row_C6:
-    !byte $50,$05
+    !byte $54,$05
     !byte $FF,$00,$01,$02,$03,$FF,$FF,$04,$05,$06,$07,$08,$09,$0A,$0B,$0C
     !byte $0D,$FF,$FF,$0E,$0F,$10,$11,$FF,$FF,$FF,$12,$13,$14,$15,$16,$17
     !byte $18,$19,$1A,$1B,$1C,$1D,$FF,$1E,$FF,$1F,$20,$21,$FF,$FF,$22,$FF
@@ -236,7 +268,7 @@ gb_row_C6:
 
 ; row hi=$C7 entries=55
 gb_row_C7:
-    !byte $90,$05
+    !byte $94,$05
     !byte $00,$FF,$01,$FF,$FF,$02,$03,$04,$05,$FF,$06,$FF,$FF,$07,$FF,$08
     !byte $09,$0A,$0B,$FF,$FF,$FF,$0C,$FF,$0D,$FF,$0E,$FF,$0F,$FF,$10,$11
     !byte $FF,$FF,$12,$13,$14,$15,$16,$FF,$17,$FF,$FF,$FF,$FF,$FF,$FF,$18
@@ -246,7 +278,7 @@ gb_row_C7:
 
 ; row hi=$C8 entries=63
 gb_row_C8:
-    !byte $C7,$05
+    !byte $CB,$05
     !byte $00,$01,$FF,$02,$03,$04,$FF,$05,$FF,$06,$07,$FF,$08,$09,$0A,$0B
     !byte $0C,$FF,$FF,$0D,$0E,$FF,$0F,$10,$11,$12,$13,$14,$FF,$15,$FF,$16
     !byte $FF,$17,$18,$19,$1A,$1B,$1C,$1D,$FF,$1E,$1F,$20,$FF,$21,$22,$FF
@@ -256,7 +288,7 @@ gb_row_C8:
 
 ; row hi=$C9 entries=61
 gb_row_C9:
-    !byte $06,$06
+    !byte $0A,$06
     !byte $00,$01,$02,$03,$04,$FF,$FF,$05,$06,$FF,$07,$FF,$08,$09,$FF,$0A
     !byte $0B,$0C,$0D,$0E,$0F,$10,$FF,$FF,$11,$12,$FF,$13,$14,$FF,$FF,$15
     !byte $16,$17,$FF,$FF,$FF,$18,$FF,$19,$FF,$FF,$1A,$1B,$1C,$FF,$1D,$1E
@@ -266,7 +298,7 @@ gb_row_C9:
 
 ; row hi=$CA entries=73
 gb_row_CA:
-    !byte $43,$06
+    !byte $47,$06
     !byte $00,$01,$02,$03,$04,$05,$06,$07,$08,$09,$0A,$0B,$FF,$0C,$0D,$0E
     !byte $0F,$10,$11,$12,$13,$14,$15,$FF,$16,$FF,$17,$18,$19,$1A,$1B,$1C
     !byte $FF,$1D,$FF,$FF,$1E,$1F,$20,$FF,$FF,$21,$FF,$22,$23,$24,$25,$26
@@ -276,7 +308,7 @@ gb_row_CA:
 
 ; row hi=$CB entries=64
 gb_row_CB:
-    !byte $8C,$06
+    !byte $90,$06
     !byte $FF,$00,$01,$02,$03,$04,$05,$FF,$FF,$06,$07,$08,$09,$0A,$0B,$0C
     !byte $FF,$0D,$0E,$FF,$0F,$FF,$FF,$FF,$10,$11,$FF,$12,$13,$14,$15,$16
     !byte $FF,$17,$FF,$18,$FF,$19,$1A,$FF,$1B,$1C,$FF,$1D,$1E,$1F,$FF,$FF
@@ -286,7 +318,7 @@ gb_row_CB:
 
 ; row hi=$CC entries=58
 gb_row_CC:
-    !byte $CC,$06
+    !byte $D0,$06
     !byte $FF,$FF,$FF,$00,$01,$FF,$02,$03,$04,$FF,$05,$06,$FF,$FF,$07,$08
     !byte $FF,$09,$0A,$FF,$FF,$0B,$FF,$0C,$0D,$FF,$FF,$0E,$0F,$10,$11,$12
     !byte $13,$FF,$14,$FF,$FF,$15,$16,$FF,$17,$FF,$18,$FF,$19,$1A,$FF,$FF
@@ -296,7 +328,7 @@ gb_row_CC:
 
 ; row hi=$CD entries=66
 gb_row_CD:
-    !byte $06,$07
+    !byte $0A,$07
     !byte $FF,$00,$01,$02,$03,$04,$05,$06,$07,$FF,$FF,$08,$09,$FF,$0A,$0B
     !byte $FF,$0C,$0D,$0E,$0F,$10,$11,$12,$FF,$FF,$13,$14,$15,$16,$17,$18
     !byte $19,$1A,$1B,$FF,$1C,$1D,$FF,$1E,$FF,$FF,$1F,$20,$FF,$FF,$21,$22
@@ -306,7 +338,7 @@ gb_row_CD:
 
 ; row hi=$CE entries=61
 gb_row_CE:
-    !byte $48,$07
+    !byte $4C,$07
     !byte $FF,$00,$01,$FF,$02,$FF,$03,$04,$05,$06,$FF,$07,$FF,$08,$09,$0A
     !byte $0B,$0C,$0D,$0E,$FF,$0F,$FF,$10,$11,$12,$13,$FF,$14,$FF,$15,$16
     !byte $FF,$17,$18,$19,$1A,$1B,$1C,$1D,$FF,$1E,$FF,$1F,$FF,$FF,$FF,$FF
@@ -316,7 +348,7 @@ gb_row_CE:
 
 ; row hi=$CF entries=73
 gb_row_CF:
-    !byte $85,$07
+    !byte $89,$07
     !byte $00,$01,$02,$03,$04,$05,$06,$FF,$FF,$07,$FF,$FF,$FF,$08,$09,$0A
     !byte $0B,$0C,$FF,$0D,$0E,$0F,$10,$11,$12,$13,$FF,$14,$15,$FF,$16,$FF
     !byte $17,$18,$19,$1A,$1B,$1C,$FF,$1D,$1E,$1F,$20,$21,$22,$23,$FF,$24
@@ -326,7 +358,7 @@ gb_row_CF:
 
 ; row hi=$D0 entries=67
 gb_row_D0:
-    !byte $CE,$07
+    !byte $D2,$07
     !byte $00,$01,$02,$FF,$FF,$03,$04,$FF,$05,$06,$FF,$07,$08,$FF,$09,$FF
     !byte $0A,$0B,$0C,$0D,$0E,$0F,$10,$FF,$11,$12,$13,$14,$FF,$FF,$FF,$15
     !byte $16,$17,$FF,$18,$19,$FF,$1A,$FF,$1B,$FF,$1C,$1D,$1E,$1F,$FF,$20
@@ -336,7 +368,7 @@ gb_row_D0:
 
 ; row hi=$D1 entries=58
 gb_row_D1:
-    !byte $11,$08
+    !byte $15,$08
     !byte $00,$FF,$FF,$FF,$FF,$FF,$01,$02,$03,$04,$FF,$FF,$05,$FF,$06,$07
     !byte $FF,$08,$FF,$FF,$09,$0A,$FF,$0B,$0C,$FF,$0D,$0E,$0F,$FF,$10,$11
     !byte $FF,$12,$FF,$FF,$13,$14,$15,$FF,$FF,$16,$FF,$17,$18,$19,$1A,$1B
@@ -346,7 +378,7 @@ gb_row_D1:
 
 ; row hi=$D2 entries=60
 gb_row_D2:
-    !byte $4B,$08
+    !byte $4F,$08
     !byte $00,$FF,$01,$FF,$FF,$FF,$02,$FF,$03,$04,$05,$FF,$FF,$FF,$06,$07
     !byte $08,$09,$0A,$FF,$0B,$0C,$FF,$FF,$0D,$0E,$0F,$FF,$10,$FF,$FF,$11
     !byte $12,$13,$FF,$14,$15,$16,$17,$FF,$18,$FF,$19,$1A,$FF,$1B,$1C,$FF
@@ -356,7 +388,7 @@ gb_row_D2:
 
 ; row hi=$D3 entries=61
 gb_row_D3:
-    !byte $87,$08
+    !byte $8B,$08
     !byte $00,$01,$FF,$02,$03,$04,$FF,$FF,$FF,$05,$FF,$06,$07,$08,$09,$0A
     !byte $FF,$0B,$0C,$0D,$0E,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$0F,$10,$11
     !byte $FF,$12,$13,$14,$15,$16,$17,$18,$19,$1A,$FF,$1B,$1C,$1D,$FF,$1E
@@ -366,7 +398,7 @@ gb_row_D3:
 
 ; row hi=$D4 entries=70
 gb_row_D4:
-    !byte $C4,$08
+    !byte $C8,$08
     !byte $00,$01,$02,$03,$04,$FF,$FF,$FF,$FF,$05,$FF,$06,$07,$08,$FF,$09
     !byte $0A,$0B,$FF,$0C,$0D,$0E,$FF,$0F,$10,$11,$12,$13,$14,$15,$16,$17
     !byte $FF,$18,$19,$1A,$FF,$1B,$FF,$1C,$FF,$1D,$1E,$1F,$FF,$20,$21,$22
@@ -376,7 +408,7 @@ gb_row_D4:
 
 ; row hi=$D5 entries=53
 gb_row_D5:
-    !byte $0A,$09
+    !byte $0E,$09
     !byte $FF,$FF,$00,$FF,$FF,$FF,$FF,$01,$FF,$02,$FF,$03,$04,$05,$FF,$FF
     !byte $FF,$FF,$06,$07,$FF,$FF,$FF,$FF,$08,$FF,$FF,$09,$0A,$0B,$FF,$FF
     !byte $FF,$0C,$FF,$FF,$0D,$0E,$0F,$FF,$10,$11,$12,$13,$14,$FF,$15,$16
@@ -386,7 +418,7 @@ gb_row_D5:
 
 ; row hi=$D6 entries=68
 gb_row_D6:
-    !byte $3F,$09
+    !byte $43,$09
     !byte $FF,$00,$01,$02,$03,$04,$05,$FF,$06,$07,$08,$09,$0A,$0B,$0C,$0D
     !byte $0E,$0F,$10,$11,$12,$FF,$13,$14,$15,$16,$17,$18,$19,$1A,$FF,$FF
     !byte $1B,$1C,$1D,$FF,$FF,$1E,$1F,$FF,$FF,$20,$FF,$FF,$FF,$21,$FF,$22
@@ -396,7 +428,7 @@ gb_row_D6:
 
 ; row hi=$D7 entries=58
 gb_row_D7:
-    !byte $83,$09
+    !byte $87,$09
     !byte $00,$01,$02,$03,$04,$05,$FF,$06,$07,$08,$FF,$09,$FF,$0A,$0B,$0C
     !byte $FF,$0D,$0E,$0F,$FF,$FF,$10,$FF,$FF,$FF,$FF,$11,$12,$FF,$FF,$13
     !byte $FF,$FF,$FF,$FF,$14,$FF,$FF,$15,$FF,$16,$17,$18,$FF,$FF,$19,$1A

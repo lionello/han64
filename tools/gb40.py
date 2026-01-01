@@ -7,7 +7,7 @@ ROW_LAST  = 0xD7          # inclusive, 40 rows
 COL_FIRST = 0xA1
 COL_LAST  = 0xFE          # inclusive, 94 cols
 
-OFFSET = 1                # glyph ID offset (to account for special chars)
+OFFSET = 5                # glyph ID offset (to account for special chars)
 MISSING = 0xFF            # sentinel, rank must stay < 0x80
 
 def extract_gb2312_codes_from_bytes(data: bytes):
@@ -67,19 +67,50 @@ def build_row_matrices(sorted_codes) -> dict[int, tuple[int, list[int], int]]:
         out[row] = (base, cells, count)
     return out
 
-def emit_asm(rows: dict[int,tuple], out_path: str):
+def collect_sparse_codes(sorted_codes):
+    """Extract codes outside $B0-$D7 range (sparse rows)"""
+    sparse = []
+    for gid, (hi, lo) in enumerate(sorted_codes):
+        if not (ROW_FIRST <= hi <= ROW_LAST):
+            sparse.append((hi, lo, gid + OFFSET))
+    return sparse
+
+def emit_asm(rows: dict[int,tuple], sparse_codes: list, out_path: str):
     def b(x): return f"${x:02X}"
     def wbytes(x): return f"${x & 0xFF:02X},${(x>>8)&0xFF:02X}"
 
     lines = []
-    lines.append("; Auto-generated GB2312 row matrices for hi=$B0..$D7")
+    lines.append("; Auto-generated GB2312 lookup tables")
     lines.append("; Input: raw GB2312-encoded text files")
+    lines.append("")
+
+    # Emit sparse character table if any
+    if sparse_codes:
+        lines.append("; ------------------------------------------------------------")
+        lines.append("; Sparse character lookup table (codes outside $B0-$D7)")
+        lines.append("; Format: [hi, lo, glyphID_lo, glyphID_hi] * N, terminated by $00")
+        lines.append("; ------------------------------------------------------------")
+        lines.append("")
+        lines.append("gb_sparse_table:")
+        for hi, lo, gid in sparse_codes:
+            gid_lo = gid & 0xFF
+            gid_hi = (gid >> 8) & 0xFF
+            lines.append(f"    !byte ${hi:02X},${lo:02X}  ; GB2312 code")
+            lines.append(f"    !word ${gid:04X}      ; glyphID {gid}")
+        lines.append("    !byte 0  ; end of table")
+        lines.append("")
+        lines.append(f"; Total sparse character entries: {len(sparse_codes)}")
+        lines.append("")
+
+    # Emit row matrices for $B0-$D7
+    lines.append("; ------------------------------------------------------------")
+    lines.append("; GB2312 row matrices for hi=$B0..$D7")
     lines.append("; Layout per row: .word baseGlyphID, then 94 bytes (rank 0..count-1) or $FF=missing")
     lines.append("; glyphID = baseGlyphID + rank")
     lines.append(f"; Missing sentinel = ${MISSING:02X} (rank must stay < $80 so BMI can detect missing)")
+    lines.append("; ------------------------------------------------------------")
     lines.append("")
 
-    # First emit all rows with good coverage (~60%)
     for row in range(ROW_FIRST, ROW_LAST + 1):
         base, cells, cnt = rows[row]
         lines.append(f"; row hi={b(row)} entries={cnt}")
@@ -90,17 +121,6 @@ def emit_asm(rows: dict[int,tuple], out_path: str):
             lines.append("    !byte " + ",".join(b(x) for x in chunk))
         lines.append("")
 
-    # Now emit a table of pointers to each row
-    # lines.append("; Table of pointers to GB2312 row matrices")
-    # lines.append("gb_row_ptr_lo:")
-    # for row in range(ROW_FIRST, ROW_LAST + 1):
-    #     lines.append(f"    !word <gb_row_{row:02X}")
-    # lines.append("")
-    # lines.append("gb_row_ptr_hi:")
-    # for row in range(ROW_FIRST, ROW_LAST + 1):
-    #     lines.append(f"    !word >gb_row_{row:02X}")
-    # lines.append("")
-
     Path(out_path).write_text("\n".join(lines))
 
 if __name__ == "__main__":
@@ -108,5 +128,12 @@ if __name__ == "__main__":
     inputs = sys.argv[1:] or ["gb2312_chars.txt"]
     codes = gb_codes_from_files(inputs)
     rows = build_row_matrices(codes)
-    emit_asm(rows, "gb40_rows.asm")
+    sparse = collect_sparse_codes(codes)
+    emit_asm(rows, sparse, "gb40_rows.asm")
+
     print(f"Wrote gb40_rows.asm from {len(codes)} unique GB2312 codes")
+    if sparse:
+        print(f"  - {len(sparse)} sparse characters (outside $B0-$D7)")
+        for hi, lo, gid in sparse:
+            print(f"    ${hi:02X}${lo:02X} -> glyphID {gid}")
+    print(f"  - {len(codes) - len(sparse)} hanzi characters ($B0-$D7)")

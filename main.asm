@@ -37,14 +37,15 @@ _start
 	inx
 	bne -
 
-	lda #$0F
-	ldx #$00
--	sta COLOR+$000,x
-	sta COLOR+$100,x
-	sta COLOR+$200,x
-	sta COLOR+$2E8,x
-	inx
-	bne -
+; Set all colors to light gray
+;	lda #$0F
+;	ldx #$00
+;-	sta COLOR+$000,x
+;	sta COLOR+$100,x
+;	sta COLOR+$200,x
+;	sta COLOR+$2E8,x
+;	inx
+;	bne -
 
 ; Set black background + border
 	;lda #$00
@@ -70,10 +71,10 @@ _start
 	sta msgptr+1
 .nextchar
 	ldy #1
-	lda (msgptr), y		; Get GB2312 column byte
+	lda (msgptr),y		; Get GB2312 column byte
 	tax
 	dey
-	lda (msgptr), y		; Get GB2312 row byte (or ASCII)
+	lda (msgptr),y		; Get GB2312 row byte (or ASCII)
 	beq .done		; End of text
 	bpl +			; 0..127 ASCII => no 2nd byte
 	inc msgptr		; Move to next byte (lo byte)
@@ -84,6 +85,7 @@ _start
 	inc msgptr+1		; Move to next byte (hi byte)
 +	jsr GB2312_LookupGlyphID
 	; A = glyph lo, X = glyph hi if found
+	bcc .incache1
 
 	; Check if glyph A/X is in cache
 	sta tmp1		; save glyphID-lo
@@ -99,7 +101,7 @@ _start
 
 	lda next1		; destination character slot
 	beq .incache1		; zero => wrapped around; don't overwrite cache
-	sta (tmpptr), y		; store in cache
+	sta (tmpptr),y		; store in cache
 	tay			; Y = char slot
 	lda tmp1		; load glyphID-lo
 	jsr CopyGlyph8
@@ -123,7 +125,7 @@ scr:	sta SCREEN		; patched
 .loop   jmp .loop
 
 next1:	!byte 1			; 0 = space, so start at 1
-cache1:	!fill 2502		; glyphID cache (space + 2501)
+cache1:	!fill 1+2501+13		; glyphID cache (space + 2501 + 13 punctuation)
 
 scr_lo = scr+1
 scr_hi = scr+2
@@ -171,10 +173,25 @@ dst_lo = dst+1
 dst_hi = dst+2
 
 ; ------------------------------------------------------------
-; GB2312 -> glyphID lookup (rows $B0..$D7, 96 bytes per row)
-; Row layout (generated):
-;   !word baseGlyphID
-;   !byte rank[94]      ; 0..count-1, $FF = missing (BMI)
+; Punctuation lookup table (4 entries)
+; ------------------------------------------------------------
+
+punctuation:
+	!byte $A1,$A3  ; 。(period)
+	!word 1     ; glyphID (TODO: set actual IDs)
+	!byte $A3,$A1  ; ！(exclamation mark)
+	!word 2
+	!byte $A3,$AC  ; ，(comma)
+	!word 3
+	!byte $A3,$BF  ; ？(question mark)
+	!word 4
+	!byte 0 ; end of table
+
+; ------------------------------------------------------------
+; GB2312 -> glyphID lookup
+; Handles:
+;   - Hanzi rows $B0..$D7 (rank-based, checked first)
+;   - Sparse characters (linear search fallback)
 ;
 ; IN:
 ;   A = hi byte
@@ -182,29 +199,22 @@ dst_hi = dst+2
 ;
 ; OUT:
 ;   C=1 found: A=glyph lo, X=glyph hi
-;   C=0 missing/out-of-range: A,X unchanged
+;   C=0 missing: A=0, X=0
 ;
-; CLOBBERS: Y, tmpptr, base
+; CLOBBERS: Y, tmpptr, tmp1, tmp2
 ; ------------------------------------------------------------
 
 GB2312_LookupGlyphID:
-	; hi in $B0..$D7?
+	; GB2312 row in $B0..$D7?
 	cmp #$B0
-	bcc .miss
+	bcc .try_sparse   	; < $B0, try sparse characters
 	cmp #$D8
-	bcs .miss
-
-	; lo in $A1..$FE?
-	cpx #$A1
-	bcc .miss
-	cpx #$FF
-	bcs .miss
+	bcs .try_sparse   	; >= $D8, try sparse characters
 
 	; row index = hi - $B0
 	sec
 	sbc #$B0
 	tay
-
 	; tmpptr = row base
 	lda gb_row_ptr_lo,y
 	sta tmpptr
@@ -220,25 +230,46 @@ GB2312_LookupGlyphID:
 	sta tmp2
 
 	; Y = col+2
-	txa
+	txa			; A = GB2312 column byte
 	sec
-	sbc #$A1            ; A = col (0..93)
-	clc
-	adc #2
+	sbc #$A1-2		; Y = column index + skip baseGlyphID (2 bytes)
+	bcc .miss		; < $A1 => not in hanzi
 	tay
+	lda (tmpptr),y		; A = rank or $FF
+	bmi .miss		; $FF = not in 2501 hanzi
 
-	lda (tmpptr),y         ; A = rank or $FF
-	bmi .miss
-
-	; glyphID = base + rank
+	; glyphID = baseGlyphID + rank
 	clc
-	adc tmp1          ; A = glyph lo
+	adc tmp1		; A = glyph lo
 	pha
 	lda tmp2
 	adc #0
-	tax                 ; X = glyph hi
-	pla                 ; A = glyph lo
-	sec                 ; found
+	tax			; X = glyph hi
+	pla			; A = glyph lo
+	sec			; found
+	rts
+
+.try_sparse:
+	; Linear search through sparse characters
+	; A = GB2312 row byte, X = column byte
+	sta tmp1		; save row byte
+	ldy #0
+.sparse_loop:
+	lda punctuation,y
+	beq .miss		; end of table, not found
+	iny
+	iny
+	iny
+	iny              	; skip 4 bytes to next entry
+	cmp tmp1		; compare row
+	bne .sparse_loop
+	txa
+	cmp punctuation+1-4,y	; compare column
+	bne .sparse_loop
+	lda punctuation+3-4,y	; glyphID hi
+	tax
+	lda punctuation+2-4,y	; glyphID lo
+	sec			; found
 	rts
 
 .miss:
@@ -276,7 +307,39 @@ msg	!binary "chabuduo.bin"
 	!byte 0
 
 ; Include 8x8 font data
-FONT8_BASE	!byte 0,0,0,0,0,0,0,0	; space
-		!binary "font8.bin"
+FONT8_BASE	!byte 0,0,0,0,0,0,0,0	; 0=space
+		!byte %00000000		; 1=period (a1a3) 。
+		!byte %00000000
+		!byte %00000000
+		!byte %00000000
+		!byte %00100000
+		!byte %01010000
+		!byte %00100000
+		!byte %00000000
+		!byte %01000000		; 2=exclamation mark (a3a1) ！
+		!byte %01000000
+		!byte %01000000
+		!byte %01000000
+		!byte %01000000
+		!byte %00000000
+		!byte %01000000
+		!byte %00000000
+		!byte %00000000		; 3=comma (a3ac) ，
+		!byte %00000000
+		!byte %00000000
+		!byte %00000000
+		!byte %00100000
+		!byte %00100000
+		!byte %01000000
+		!byte %00000000
+		!byte %01100000		; 4=question mark (a3bf) ？
+		!byte %10010000
+		!byte %00010000
+		!byte %00100000
+		!byte %01000000
+		!byte %00000000
+		!byte %01000000
+		!byte %00000000
+		!binary "font8.bin"	; 5..2505
 
 !source "gb40_rows.asm"
