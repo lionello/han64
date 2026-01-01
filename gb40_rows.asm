@@ -7,23 +7,23 @@
 ; ------------------------------------------------------------
 
 gb_sparse_append:
-    !byte $E3,$B6  ; GB2312 code
+    !byte $E3,$B6  ; GB2312 愣
     !word $09C1      ; glyphID 2497
-    !byte $E8,$EB  ; GB2312 code
+    !byte $E8,$EB  ; GB2312 桦
     !word $09C2      ; glyphID 2498
-    !byte $E9,$D9  ; GB2312 code
+    !byte $E9,$D9  ; GB2312 橘
     !word $09C3      ; glyphID 2499
-    !byte $F2,$BE  ; GB2312 code
+    !byte $F2,$BE  ; GB2312 蚓
     !word $09C4      ; glyphID 2500
-    !byte $F2,$C7  ; GB2312 code
+    !byte $F2,$C7  ; GB2312 蚯
     !word $09C5      ; glyphID 2501
-    !byte $F2,$D1  ; GB2312 code
+    !byte $F2,$D1  ; GB2312 蜓
     !word $09C6      ; glyphID 2502
-    !byte $F2,$F0  ; GB2312 code
+    !byte $F2,$F0  ; GB2312 蝠
     !word $09C7      ; glyphID 2503
-    !byte $F2,$F9  ; GB2312 code
+    !byte $F2,$F9  ; GB2312 蝙
     !word $09C8      ; glyphID 2504
-    !byte $F6,$F9  ; GB2312 code
+    !byte $F6,$F9  ; GB2312 鳄
     !word $09C9      ; glyphID 2505
     !byte 0  ; end of table
 
