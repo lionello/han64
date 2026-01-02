@@ -4,3 +4,5 @@ build
 .vscode/c_cpp_properties.json
 .vscode/settings.json
 viewer.prg
+tools/DinkieBitmap_Demo_v1_100
+/tools/Unihan
