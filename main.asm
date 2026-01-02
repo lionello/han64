@@ -8,32 +8,43 @@
     !text "2064", $00		; address as string, then end-of-line
 +   !word 0			; end of BASIC program
 
-; Start of actual program
-* = $0810
+COLOR		= $D800
+CIA_VICBANK	= $DD00  	; VIC bank register
+VIC_MEMORY	= $D018		; VIC memory control register
 
-SCREEN  = $0400
-COLOR   = $D800
-VIC_BANK = $DD00  		; VIC bank register
-VIC_MEMORY = $D018		; VIC memory control register
-CHARSET1_BANK = 6		; ($3000-$37FF)
-CHARSET1_BASE = CHARSET1_BANK*$800; Custom character set location
+VIC_BASE	= $8000
+SCREEN_BASE	= VIC_BASE+$800	; Screen memory location
+CHARSET1_BASE	= VIC_BASE+$000	; Custom character set location
+
+VIC_BANK	= 3-(>VIC_BASE/$40)	; VIC bank number (0..3)
+CHARSET1_BANK	= >(CHARSET1_BASE-VIC_BASE)/$8	; Character set bank number (0..3)
+SCREEN_BANK	= >(SCREEN_BASE-VIC_BASE)/$4	; Screen memory bank number (0..3)
 
 tmpptr	= $FB			; 2 bytes ZP: $FB/$FC
 msgptr	= $FD			; Pointer into msg: $FD/$FE
 tmp1	= $02
 tmp2	= $FF
 
+; Start of actual program
+* = $0810
+
 _start
 	sei
 	cld
 
+; Change the VIC bank to Bank2: $8000-$BFFF
+	lda CIA_VICBANK
+	and #%11111100
+	ora #VIC_BANK		; set bits 1..2 to 10 (Bank2)
+	sta CIA_VICBANK
+
 ; Clear screen to spaces ($0 screen code) and set color = light gray ($0F)
 	lda #$00
 	ldx #$00
--	sta SCREEN+$000,x
-	sta SCREEN+$100,x
-	sta SCREEN+$200,x
-	sta SCREEN+$2E8,x	; remainder (1000 bytes total)
+-	sta SCREEN_BASE+$000,x
+	sta SCREEN_BASE+$100,x
+	sta SCREEN_BASE+$200,x
+	sta SCREEN_BASE+$2E8,x	; remainder (1000 bytes total)
 	inx
 	bne -
 
@@ -54,8 +65,9 @@ _start
 
 ; Configure VIC-II to use custom character set
 	lda VIC_MEMORY
-	and #$F0		; clear character set bits
-	ora #CHARSET1_BANK*2	; set charset at $3000 (bank 6)
+	and #%00000001		; clear character set bits
+	ora #CHARSET1_BANK*2	; set charset bank in bits 1..3
+	ora #SCREEN_BANK*16	; set screen memory bank in bits 4..5
 	sta VIC_MEMORY
 
 ; Make space glyph
@@ -83,7 +95,9 @@ _start
 +	inc msgptr		; Move to next byte (lo byte)
 	bne +
 	inc msgptr+1		; Move to next byte (hi byte)
-+	jsr GB2312_LookupGlyphID
++	cmp #$0A		; newline?
+	beq .newline
+	jsr GB2312_LookupGlyphID
 	; A = glyph lo, X = glyph hi if found
 	bcc .incache1
 
@@ -110,7 +124,7 @@ _start
 	inc next1
 .incache1:
 	; Print character to screen
-scr:	sta SCREEN		; patched
+scr:	sta SCREEN_BASE		; patched
 	inc scr_lo
 	bne .gotlo3
 	inc scr_hi
@@ -118,6 +132,27 @@ scr:	sta SCREEN		; patched
 	cmp #$08
 	beq .done
 .gotlo3:
+	dec col40
+	bne .nextchar
+	lda #40
+	sta col40		; reset countdown
+	jmp .nextchar
+
+.newline:
+	; Advance to start of next line
+	; Just add col40 (remaining columns) to screen pointer
+	lda col40
+	clc
+	adc scr_lo
+	sta scr_lo
+	bcc +
+	inc scr_hi
++	lda scr_hi
+	cmp #$08
+	beq .done
+
+	lda #40
+	sta col40		; reset countdown
 	jmp .nextchar
 
 .done
@@ -126,6 +161,7 @@ scr:	sta SCREEN		; patched
 
 next1:	!byte 1			; 0 = space, so start at 1
 cache1:	!fill 1+2501+13		; glyphID cache (space + 2501 + 13 punctuation)
+col40:	!byte 40		; columns remaining until wrap (40..1)
 
 scr_lo = scr+1
 scr_hi = scr+2
