@@ -8,9 +8,9 @@
     !text "2064", $00		; address as string, then end-of-line
 +   !word 0			; end of BASIC program
 
-COLOR		= $D800
-CIA_VICBANK	= $DD00  	; VIC bank register
 VIC_MEMORY	= $D018		; VIC memory control register
+COLOR_BASE	= $D800
+CIA_VICBANK	= $DD00  	; VIC bank register
 
 VIC_BASE	= $8000
 SCREEN_BASE	= VIC_BASE+$800	; Screen memory location
@@ -51,10 +51,10 @@ _start
 ; Set all colors to light gray
 ;	lda #$0F
 ;	ldx #$00
-;-	sta COLOR+$000,x
-;	sta COLOR+$100,x
-;	sta COLOR+$200,x
-;	sta COLOR+$2E8,x
+;-	sta COLOR_BASE$000,x
+;	sta COLOR_BASE$100,x
+;	sta COLOR_BASE$200,x
+;	sta COLOR_BASE$2E8,x
 ;	inx
 ;	bne -
 
@@ -124,7 +124,9 @@ _start
 	inc next1
 .incache1:
 	; Print character to screen
-scr:	sta SCREEN_BASE		; patched
+scr_lo = *+1
+scr_hi = *+2
+	sta SCREEN_BASE		; patched
 	inc scr_lo
 	bne .gotlo3
 	inc scr_hi
@@ -159,13 +161,6 @@ scr:	sta SCREEN_BASE		; patched
 ; Sit in an infinite loop
 .loop   jmp .loop
 
-next1:	!byte 1			; 0 = space, so start at 1
-cache1:	!fill 1+2501+13		; glyphID cache (space + 2501 + 13 punctuation)
-col40:	!byte 40		; columns remaining until wrap (40..1)
-
-scr_lo = scr+1
-scr_hi = scr+2
-
 CopyGlyph8:
 	; A = glyphID-lo, X = hi, Y = char slot
 	stx src_hi
@@ -197,16 +192,15 @@ CopyGlyph8:
 
 	ldy #7
 -
-src:    lda FONT8_BASE,y	; patched
-dst:    sta CHARSET1_BASE,y	; patched
+src_lo = *+1
+src_hi = *+2
+	lda FONT8_BASE,y	; patched
+dst_lo = *+1
+dst_hi = *+2
+	sta CHARSET1_BASE,y	; patched
 	dey
 	bpl -
 	rts
-
-src_lo = src+1
-src_hi = src+2
-dst_lo = dst+1
-dst_hi = dst+2
 
 ; ------------------------------------------------------------
 ; GB2312 -> glyphID lookup
@@ -325,7 +319,7 @@ gb_row_ptr_hi:
 	!byte >gb_row_D3,>gb_row_D4,>gb_row_D5,>gb_row_D6,>gb_row_D7
 
 msg	!binary "chabuduo.bin"
-	!byte 0
+	!byte 0				; null terminator, could be skipped because font starts with 0
 
 ; Include 8x8 font data
 FONT8_BASE	!byte 0,0,0,0,0,0,0,0	; 0=space
@@ -380,3 +374,7 @@ gb_sparse_table:
 	!word 4
 	; Generated entries appended here, terminated by $00
 !source "gb40_rows.asm"
+
+col40:	!byte 40		; columns remaining until wrap (40..1)
+next1:	!byte 1			; 0 = space, so start at 1
+cache1:	!fill 5+2501		; glyphID cache (punctuation + 2501)
