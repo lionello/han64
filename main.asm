@@ -99,7 +99,7 @@ _start
 	beq .newline
 	jsr GB2312_LookupGlyphID
 	; A = glyph lo, X = glyph hi if found
-	bcc .incache1
+	bcc .printchar
 
 	; Check if glyph A/X is in cache
 	sta tmp1		; save glyphID-lo
@@ -111,10 +111,10 @@ _start
 	sta tmpptr+1		; tmpptr-hi = glyphID-hi + cache-hi + carry
 	ldy #0
 	lda (tmpptr),y
-	bne .incache1		; non-zero => already cached
+	bne .printchar		; non-zero => already cached
 
 	lda next1		; destination character slot
-	beq .incache1		; zero => wrapped around; don't overwrite cache
+	beq .printchar		; zero => wrapped around; don't overwrite cache
 	sta (tmpptr),y		; store in cache
 	tay			; Y = char slot
 	lda tmp1		; load glyphID-lo
@@ -122,7 +122,7 @@ _start
 
 	lda next1		; get char slot
 	inc next1
-.incache1:
+.printchar:
 	; Print character to screen
 scr_lo = *+1
 scr_hi = *+2
@@ -323,6 +323,7 @@ msg	!binary "chabuduo.bin"
 
 ; Include 8x8 font data
 FONT8_BASE	!byte 0,0,0,0,0,0,0,0	; 0=space
+
 		!byte %00000000		; 1=period (a1a3) 。
 		!byte %00000000
 		!byte %00000000
@@ -331,6 +332,7 @@ FONT8_BASE	!byte 0,0,0,0,0,0,0,0	; 0=space
 		!byte %01010000
 		!byte %00100000
 		!byte %00000000
+
 		!byte %01000000		; 2=exclamation mark (a3a1) ！
 		!byte %01000000
 		!byte %01000000
@@ -339,6 +341,7 @@ FONT8_BASE	!byte 0,0,0,0,0,0,0,0	; 0=space
 		!byte %00000000
 		!byte %01000000
 		!byte %00000000
+
 		!byte %00000000		; 3=comma (a3ac) ，
 		!byte %00000000
 		!byte %00000000
@@ -347,6 +350,7 @@ FONT8_BASE	!byte 0,0,0,0,0,0,0,0	; 0=space
 		!byte %00100000
 		!byte %01000000
 		!byte %00000000
+
 		!byte %01100000		; 4=question mark (a3bf) ？
 		!byte %10010000
 		!byte %00010000
@@ -355,6 +359,7 @@ FONT8_BASE	!byte 0,0,0,0,0,0,0,0	; 0=space
 		!byte %00000000
 		!byte %01000000
 		!byte %00000000
+
 		!binary "font8.bin"	; 5..2505
 
 ; ------------------------------------------------------------
