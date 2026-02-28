@@ -4,7 +4,7 @@ A GB2312 Chinese text renderer for the Commodore 64, using 8×8 bitmap fonts wit
 
 ![Chabuduo rendered on C64](chabuduo.png)
 
-## Scope v1 (Current: Rendering)
+## Scope v1 (Rendering)
 
 - 2501+ Simplified Chinese characters (GB2312 rows $B0-$D7)
 - 8×8 pixel bitmap font (8 bytes per glyph)
