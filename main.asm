@@ -159,7 +159,7 @@ _start
 	pha			; save char slot for printing
 	lda tmp1		; load glyphID-lo
 	ldx tmp2		; load glyphID-hi
-	jsr AddGlyph8
+	jsr AddGlyph7
 	pla			; A = char slot
 	jmp .printchar
 
@@ -233,7 +233,7 @@ InitCharset:
 	lda #$00
 	sta next_char
 	tax
-	jmp AddGlyph8
+	jmp AddGlyph7
 
 ; ------------------------------------------------------------
 ; Clear CACHE_SIZE bytes at tmpptr (rounds up to full pages)
@@ -312,20 +312,23 @@ RasterIRQ:
 ;
 ; CLOBBERS: A, X, Y
 ; ------------------------------------------------------------
-AddGlyph8:
+AddGlyph7:
 	ldy next_char
 	inc next_char
-	; fall-through CopyGlyph8
+	; fall-through CopyGlyph7
 
 ; ------------------------------------------------------------
-; Copy glyph in A/X to slot Y in charset_bank
+; Copy 7-byte glyph in A/X to slot Y in charset_bank
+; (byte 7 assumed pre-zeroed in charset)
 ;
 ; IN:
 ;   A = glyphID-lo, X = hi, Y = char slot
 ;
-; CLOBBERS: A, X, Y
+; CLOBBERS: A, X, Y, tmp1, tmp2
 ; ------------------------------------------------------------
-CopyGlyph8:
+CopyGlyph7:
+	sta tmp1		; save glyphID-lo for *7
+	stx tmp2		; save glyphID-hi for *7
 	stx src_hi
 	asl
 	rol src_hi		; glyphID * 2
@@ -333,12 +336,20 @@ CopyGlyph8:
 	rol src_hi		; glyphID * 4
 	asl
 	rol src_hi		; glyphID * 8
-	; Add FONT8_BASE
+	; Add FONT7_BASE
 	;clc			; should not be needed because last rol clears
-	adc #<FONT8_BASE
+	adc #<FONT7_BASE
 	sta src_lo
 	lda src_hi
-	adc #>FONT8_BASE
+	adc #>FONT7_BASE
+	sta src_hi
+	; Subtract glyphID to get *7
+	lda src_lo
+	sec
+	sbc tmp1
+	sta src_lo
+	lda src_hi
+	sbc tmp2
 	sta src_hi
 
 	; Shift left 3 times (multiply by 8) with proper 16-bit handling
@@ -354,10 +365,10 @@ charset_bank = *+1
 	rol dst_hi		; char slot * 8
 	sta dst_lo
 
-	ldy #7
+	ldy #6
 src_lo = *+1
 src_hi = *+2
--	lda FONT8_BASE,y	; patched
+-	lda FONT7_BASE,y	; patched
 dst_lo = *+1
 dst_hi = *+2
 	sta CHARSET1_BASE,y	; patched
@@ -482,10 +493,9 @@ msg	!binary "chabuduo.bin"
 	!byte 0				; null terminator, could be skipped because font starts with 0
 
 ; Include 8x8 font data
-FONT8_BASE	!byte 0,0,0,0,0,0,0,0	; 0=space
+FONT7_BASE	!byte 0,0,0,0,0,0,0	; 0=space
 
 		!byte %00000000		; 1=period (a1a3) 。
-		!byte %00000000
 		!byte %00000000
 		!byte %00000000
 		!byte %00100000
@@ -500,10 +510,8 @@ FONT8_BASE	!byte 0,0,0,0,0,0,0,0	; 0=space
 		!byte %01000000
 		!byte %00000000
 		!byte %01000000
-		!byte %00000000
 
 		!byte %00000000		; 3=comma (a3ac) ，
-		!byte %00000000
 		!byte %00000000
 		!byte %00000000
 		!byte %00100000
@@ -518,12 +526,10 @@ FONT8_BASE	!byte 0,0,0,0,0,0,0,0	; 0=space
 		!byte %01000000
 		!byte %00000000
 		!byte %01000000
-		!byte %00000000
 
-		!binary "font8.bin"	; 5..2505
+		!binary "font7.bin"	; 5..2505
 
 		!byte %00000000		; 2505=em dash (a1aa) —
-		!byte %00000000
 		!byte %00000000
 		!byte %11111111
 		!byte %00000000
@@ -536,21 +542,18 @@ FONT8_BASE	!byte 0,0,0,0,0,0,0,0	; 0=space
 		!byte %00000000
 		!byte %00000000
 		!byte %00000000
-		!byte %00000000
 		!byte %01010100
 		!byte %00000000
 
-		!byte %00000000		; 2507=left double quote (a1b0) "
+		!byte %00000000		; 2507=left double quote (a1b0) \u201c
 		!byte %01010000
 		!byte %10100000
 		!byte %00000000
 		!byte %00000000
 		!byte %00000000
 		!byte %00000000
-		!byte %00000000
 
-		!byte %00000000		; 2508=right double quote (a1b1) "
-		!byte %00000000
+		!byte %00000000		; 2508=right double quote (a1b1) \u201d
 		!byte %00000000
 		!byte %00000000
 		!byte %01010000
@@ -559,7 +562,6 @@ FONT8_BASE	!byte 0,0,0,0,0,0,0,0	; 0=space
 		!byte %00000000
 
 		!byte %00000000		; 2509=fullwidth colon (a3ba) ：
-		!byte %00000000
 		!byte %00100000
 		!byte %00000000
 		!byte %00000000
@@ -568,7 +570,6 @@ FONT8_BASE	!byte 0,0,0,0,0,0,0,0	; 0=space
 		!byte %00000000
 
 		!byte %00000000		; 2510=fullwidth semicolon (a3bb) ；
-		!byte %00000000
 		!byte %00100000
 		!byte %00000000
 		!byte %00000000
