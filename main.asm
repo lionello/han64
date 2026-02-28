@@ -13,17 +13,21 @@ COLOR_BASE	= $D800
 CIA_VICBANK	= $DD00  	; VIC bank register
 
 VIC_BASE	= $8000
-SCREEN_BASE	= VIC_BASE+$800	; Screen memory location
-CHARSET1_BASE	= VIC_BASE+$000	; Custom character set location
+CHARSET1_BASE	= VIC_BASE+$0000	; Custom character set 1 (256 chars, 2KB)
+CHARSET2_BASE	= VIC_BASE+$0800	; Custom character set 2 (256 chars, 2KB)
+SCREEN_BASE	= VIC_BASE+$2000	; Screen memory location (1KB)
 
-VIC_BANK	= 3-(>VIC_BASE/$40)	; VIC bank number (0..3)
-CHARSET1_BANK	= >(CHARSET1_BASE-VIC_BASE)/$8	; Character set bank number (0..3)
-SCREEN_BANK	= >(SCREEN_BASE-VIC_BASE)/$4	; Screen memory bank number (0..3)
+VIC_BANK	= >VIC_BASE/$40	; VIC bank number (0..3)
+CHARSET1_BANK	= >(CHARSET1_BASE-VIC_BASE)/$8	; Character set bank number (0..7)
+CHARSET2_BANK	= >(CHARSET2_BASE-VIC_BASE)/$8	; Character set 2 bank number (0..7)
+SCREEN_BANK	= >(SCREEN_BASE-VIC_BASE)/$4	; Screen memory bank number (0..15)
 
 tmpptr	= $FB			; 2 bytes ZP: $FB/$FC
 msgptr	= $FD			; Pointer into msg: $FD/$FE
 tmp1	= $02
 tmp2	= $FF
+
+CHARSET_SWITCH_ROW = 12		; Rows 0-11: charset1, rows 12-24: charset2
 
 ; Start of actual program
 * = $0810
@@ -35,12 +39,12 @@ _start
 ; Change the VIC bank to Bank2: $8000-$BFFF
 	lda CIA_VICBANK
 	and #%11111100
-	ora #VIC_BANK		; set bits 1..2 to 10 (Bank2)
+	ora #3-VIC_BANK		; set bits 0..1
 	sta CIA_VICBANK
 
 ; Clear screen to spaces ($0 screen code) and set color = light gray ($0F)
 	lda #$00
-	ldx #$00
+	tax
 -	sta SCREEN_BASE+$000,x
 	sta SCREEN_BASE+$100,x
 	sta SCREEN_BASE+$200,x
@@ -70,24 +74,199 @@ _start
 	ora #SCREEN_BANK*16	; set screen memory bank in bits 4..5
 	sta VIC_MEMORY
 
-; Make space glyph
-	lda #$00
-	tax
-	tay
-	jsr CopyGlyph8
+; Clear caches
+	lda #<cache1
+	sta tmpptr
+	lda #>cache1
+	sta tmpptr+1
+	jsr ClearCache
+	lda #<cache2
+	sta tmpptr
+	lda #>cache2
+	sta tmpptr+1
+	jsr ClearCache
+
+	jsr InitCharset
+
+; Set up raster IRQ for charset switching
+	lda #$7F
+	sta $DC0D		; disable all CIA1 interrupts
+	lda $DC0D		; acknowledge any pending
+	lda #(50 + CHARSET_SWITCH_ROW * 8)  ; raster line for row 12
+	sta $D012
+	lda $D011
+	and #$7F		; clear bit 7 for lines < 256
+	sta $D011
+	lda #$01		; enable raster interrupts
+	sta $D01A
+	lda #<RasterIRQ
+	sta $0314
+	lda #>RasterIRQ
+	sta $0315
+	cli
 
 ; Grab GB2312 chars from 'msg' and copy to custom charset
 	lda #<msg
 	sta msgptr
 	lda #>msg
 	sta msgptr+1
-.nextchar
+
+.loop
+	jsr ReadChar
+	cmp #$0A		; newline?
+	beq .newline
+	bcc .done		; non-printables
+
+	jsr GB2312_LookupGlyphID
+	; A = glyph lo, X = glyph hi, C=1 if found
+	bcc .printchar		; not found => print space (glyph 0)
+
+	sta tmp1		; save glyphID-lo
+	stx tmp2		; save glyphID-hi
+	; Choose cache based on current row
+	ldy current_row
+	cpy #CHARSET_SWITCH_ROW
+	bcs .check_cache2
+
+.check_cache1:
+	; Check if glyph A/X is in cache1
+	;clc			; should be clear from previous bcs
+	adc #<cache1
+	sta tmpptr		; tmpptr-lo = glyphID-lo + cache1-lo
+	txa
+	adc #>cache1
+	sta tmpptr+1		; tmpptr-hi = glyphID-hi + cache1-hi + carry
+	jmp +
+
+.check_cache2:
+	; Check if glyph A/X is in cache2
+	clc
+	adc #<cache2
+	sta tmpptr		; tmpptr-lo = glyphID-lo + cache2-lo
+	txa
+	adc #>cache2
+	sta tmpptr+1		; tmpptr-hi = glyphID-hi + cache2-hi + carry
+
++	ldy #0
+	lda (tmpptr),y
+	bne .printchar		; non-zero => already cached, A = char
+
+	; Not cached, copy to cache, X = destination char slot
+	lda next_char
+	beq .cache_full		; 0 => wrapped around, cache full
+
+	sta (tmpptr),y		; store char in cache
+	pha			; save char slot for printing
+	lda tmp1		; load glyphID-lo
+	ldx tmp2		; load glyphID-hi
+	jsr AddGlyph8
+	pla			; A = char slot
+	jmp .printchar
+
+.cache_full:
+	; Both caches full, show space (0); TODO: show placeholder
+
+.printchar:
+	; Print character to screen, A = char
+	jsr PrintChar
+
+-	lda current_row
+	cmp #25
+	bmi .loop
+
+.done   jmp .done		; Sit in an infinite loop
+
+.newline:
+	jsr PrintNewLine
+	jmp -
+
+; ------------------------------------------------------------
+; Print char in A to the screen and advance screen pointer
+;
+; IN: A = char
+; CLOBBERS: A
+; ------------------------------------------------------------
+PrintChar:
+scr_lo = *+1
+scr_hi = *+2
+	sta SCREEN_BASE		; patched
+	inc scr_lo
+	bne +
+	inc scr_hi
++	dec col40
+	beq .nextrow
+	rts
+
+; ------------------------------------------------------------
+; Advance screen pointer to start of next line
+;
+; CLOBBERS: A
+; ------------------------------------------------------------
+PrintNewLine:
+	; Add col40 (remaining columns) to screen pointer
+	lda col40
+	clc
+	adc scr_lo
+	sta scr_lo
+	bcc +
+	inc scr_hi
+.nextrow:
++	lda #40
+	sta col40		; reset countdown
+	inc current_row		; advance to next row
+
+	lda current_row
+	cmp #CHARSET_SWITCH_ROW
+	beq .select_charset2
+	rts
+
+.select_charset2:
+	lda #>CHARSET2_BASE/8
+	sta charset_bank
+	;jmp InitCharset fall-through
+
+; ------------------------------------------------------------
+; Initialize the charset at charset_bank
+; ------------------------------------------------------------
+InitCharset:
+	; Make space glyph
+	lda #$00
+	sta next_char
+	tax
+	jmp AddGlyph8
+
+; ------------------------------------------------------------
+; Clear CACHE_SIZE bytes at tmpptr (rounds up to full pages)
+;
+; IN: tmpptr = start address
+; CLOBBERS: A, X, Y, tmpptr
+; ------------------------------------------------------------
+ClearCache:
+	lda #0
+	tay
+	ldx #>(CACHE_SIZE+255)	; number of full pages (round up)
+-	sta (tmpptr),y
+	iny
+	bne -
+	inc tmpptr+1
+	dex
+	bne -
+	rts
+
+; ------------------------------------------------------------
+; Read GB2312 char from msgptr into A/X and advance
+;
+; OUT:
+;   A=row or ASCII, X=column
+;
+; CLOBBERS: Y=0
+; ------------------------------------------------------------
+ReadChar:
 	ldy #1
 	lda (msgptr),y		; Get GB2312 column byte
 	tax
 	dey
 	lda (msgptr),y		; Get GB2312 row byte (or ASCII)
-	beq .done		; End of text
 	bpl +			; 0..127 ASCII => no 2nd byte
 	inc msgptr		; Move to next byte (lo byte)
 	bne +
@@ -95,74 +274,58 @@ _start
 +	inc msgptr		; Move to next byte (lo byte)
 	bne +
 	inc msgptr+1		; Move to next byte (hi byte)
-+	cmp #$0A		; newline?
-	beq .newline
-	jsr GB2312_LookupGlyphID
-	; A = glyph lo, X = glyph hi if found
-	bcc .printchar
++	rts
 
-	; Check if glyph A/X is in cache
-	sta tmp1		; save glyphID-lo
-	clc
-	adc #<cache1
-	sta tmpptr		; tmpptr-lo = glyphID-lo + cache-lo
-	txa
-	adc #>cache1
-	sta tmpptr+1		; tmpptr-hi = glyphID-hi + cache-hi + carry
-	ldy #0
-	lda (tmpptr),y
-	bne .printchar		; non-zero => already cached
+; ------------------------------------------------------------
+; Raster IRQ - Switch charset at row 12
+; ------------------------------------------------------------
+RasterIRQ:
+	lda #$01
+	sta $D019		; acknowledge raster interrupt
 
-	lda next1		; destination character slot
-	beq .printchar		; zero => wrapped around; don't overwrite cache
-	sta (tmpptr),y		; store in cache
-	tay			; Y = char slot
-	lda tmp1		; load glyphID-lo
-	jsr CopyGlyph8
+	lda $D012
+	cmp #(50 + CHARSET_SWITCH_ROW * 8)
+	bne .switch_back
 
-	lda next1		; get char slot
-	inc next1
-.printchar:
-	; Print character to screen
-scr_lo = *+1
-scr_hi = *+2
-	sta SCREEN_BASE		; patched
-	inc scr_lo
-	bne .gotlo3
-	inc scr_hi
-	lda scr_hi
-	cmp #$08
-	beq .done
-.gotlo3:
-	dec col40
-	bne .nextchar
-	lda #40
-	sta col40		; reset countdown
-	jmp .nextchar
+.switch_to_charset2:
+	lda VIC_MEMORY
+	and #%11110001		; clear charset bits
+	ora #(CHARSET2_BANK*2)	; set charset2
+	sta VIC_MEMORY
+	lda #250		; next IRQ near end of screen
+	jmp +
 
-.newline:
-	; Advance to start of next line
-	; Just add col40 (remaining columns) to screen pointer
-	lda col40
-	clc
-	adc scr_lo
-	sta scr_lo
-	bcc +
-	inc scr_hi
-+	lda scr_hi
-	cmp #$08
-	beq .done
+.switch_back:
+	lda VIC_MEMORY
+	and #%11110001		; clear charset bits
+	ora #CHARSET1_BANK*2	; set charset1
+	sta VIC_MEMORY
+	lda #(50 + CHARSET_SWITCH_ROW * 8)
++	sta $D012
+	jmp $EA81		; KERNAL register restore + rti
 
-	lda #40
-	sta col40		; reset countdown
-	jmp .nextchar
+; ------------------------------------------------------------
+; Copy glyph in A/X to next free slot in charset_bank
+;
+; IN:
+;   A = glyphID-lo, X = hi
+;
+; CLOBBERS: A, X, Y
+; ------------------------------------------------------------
+AddGlyph8:
+	ldy next_char
+	inc next_char
+	; fall-through CopyGlyph8
 
-.done
-; Sit in an infinite loop
-.loop   jmp .loop
-
+; ------------------------------------------------------------
+; Copy glyph in A/X to slot Y in charset_bank
+;
+; IN:
+;   A = glyphID-lo, X = hi, Y = char slot
+;
+; CLOBBERS: A, X, Y
+; ------------------------------------------------------------
 CopyGlyph8:
-	; A = glyphID-lo, X = hi, Y = char slot
 	stx src_hi
 	asl
 	rol src_hi		; glyphID * 2
@@ -179,7 +342,8 @@ CopyGlyph8:
 	sta src_hi
 
 	; Shift left 3 times (multiply by 8) with proper 16-bit handling
-	lda #>CHARSET1_BASE/8	; always divisible by 8
+charset_bank = *+1
+	lda #>CHARSET1_BASE/8	; always divisible by 8, patched
 	sta dst_hi
 	tya			; A = char slot
 	asl
@@ -191,10 +355,9 @@ CopyGlyph8:
 	sta dst_lo
 
 	ldy #7
--
 src_lo = *+1
 src_hi = *+2
-	lda FONT8_BASE,y	; patched
+-	lda FONT8_BASE,y	; patched
 dst_lo = *+1
 dst_hi = *+2
 	sta CHARSET1_BASE,y	; patched
@@ -218,7 +381,6 @@ dst_hi = *+2
 ;
 ; CLOBBERS: Y, tmpptr, tmp1, tmp2
 ; ------------------------------------------------------------
-
 GB2312_LookupGlyphID:
 	; GB2312 row in $B0..$D7?
 	cmp #$B0
@@ -263,7 +425,6 @@ GB2312_LookupGlyphID:
 	pla			; A = glyph lo
 	sec			; found
 	rts
-
 .try_sparse:
 	; Linear search through sparse characters
 	; A = GB2312 row byte, X = column byte
@@ -286,11 +447,10 @@ GB2312_LookupGlyphID:
 	lda gb_sparse_table+2-4,y	; glyphID lo
 	sec			; found
 	rts
-
 .miss:
 	ldx #$00
 	lda #$00
-	clc
+	clc			; not found
 	rts
 
 ; ------------------------------------------------------------
@@ -381,5 +541,9 @@ gb_sparse_table:
 !source "gb40_rows.asm"
 
 col40:	!byte 40		; columns remaining until wrap (40..1)
-next1:	!byte 1			; 0 = space, so start at 1
-cache1:	!fill 5+2501		; glyphID cache (punctuation + 2501)
+current_row: !byte 0		; current screen row (0-24)
+next_char: !byte 1		; next char in charset; 0 = space, so start at 1
+
+CACHE_SIZE = 5+2501
+cache1 = *			; glyphID -> cache1 slot mapping (right after program)
+cache2 = $C000			; glyphID -> cache2 slot mapping
