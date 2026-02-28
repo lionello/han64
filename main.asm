@@ -531,6 +531,51 @@ FONT8_BASE	!byte 0,0,0,0,0,0,0,0	; 0=space
 		!byte %00000000
 		!byte %00000000
 
+		!byte %00000000		; 2506=ellipsis (a1ad) …
+		!byte %00000000
+		!byte %00000000
+		!byte %00000000
+		!byte %00000000
+		!byte %00000000
+		!byte %01010100
+		!byte %00000000
+
+		!byte %00000000		; 2507=left double quote (a1b0) "
+		!byte %01010000
+		!byte %10100000
+		!byte %00000000
+		!byte %00000000
+		!byte %00000000
+		!byte %00000000
+		!byte %00000000
+
+		!byte %00000000		; 2508=right double quote (a1b1) "
+		!byte %00000000
+		!byte %00000000
+		!byte %00000000
+		!byte %01010000
+		!byte %00101000
+		!byte %00000000
+		!byte %00000000
+
+		!byte %00000000		; 2509=fullwidth colon (a3ba) ：
+		!byte %00000000
+		!byte %00100000
+		!byte %00000000
+		!byte %00000000
+		!byte %00100000
+		!byte %00000000
+		!byte %00000000
+
+		!byte %00000000		; 2510=fullwidth semicolon (a3bb) ；
+		!byte %00000000
+		!byte %00100000
+		!byte %00000000
+		!byte %00000000
+		!byte %00100000
+		!byte %01000000
+		!byte %00000000
+
 ; ------------------------------------------------------------
 ; Sparse character lookup table
 ; - Manual entries (rows < $B0): not in tilemap, defined here
@@ -542,10 +587,20 @@ gb_sparse_table:
 	!word 1
 	!byte $A1,$AA  ; — (em dash)
 	!word 2505
+	!byte $A1,$AD  ; … (ellipsis)
+	!word 2506
+	!byte $A1,$B0  ; " (left double quote)
+	!word 2507
+	!byte $A1,$B1  ; " (right double quote)
+	!word 2508
 	!byte $A3,$A1  ; ！(exclamation mark)
 	!word 2
 	!byte $A3,$AC  ; ，(comma)
 	!word 3
+	!byte $A3,$BA  ; ：(fullwidth colon)
+	!word 2509
+	!byte $A3,$BB  ; ；(fullwidth semicolon)
+	!word 2510
 	!byte $A3,$BF  ; ？(question mark)
 	!word 4
 	; Generated entries appended here, terminated by $00
@@ -555,6 +610,6 @@ col40:	!byte 40		; columns remaining until wrap (40..1)
 current_row: !byte 0		; current screen row (0-24)
 next_char: !byte 1		; next char in charset; 0 = space, so start at 1
 
-CACHE_SIZE = 6+2501
+CACHE_SIZE = 11+2501
 cache1 = *			; glyphID -> cache1 slot mapping (right after program)
 cache2 = $C000			; glyphID -> cache2 slot mapping
