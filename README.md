@@ -4,9 +4,9 @@ A GB2312 Chinese text renderer for the Commodore 64, using 8×8 bitmap fonts wit
 
 ![Chabuduo rendered on C64](chabuduo.png)
 
-## Scope (v1 - Current: Rendering)
+## Scope v1 (Current: Rendering)
 
-- 2501 Simplified Chinese characters (GB2312 rows $B0-$D7)
+- 2501+ Simplified Chinese characters (GB2312 rows $B0-$D7)
 - 8×8 pixel bitmap font (8 bytes per glyph)
 - GB2312-encoded text display from binary files
 - Dynamic character caching (256 character slots)
@@ -14,12 +14,16 @@ A GB2312 Chinese text renderer for the Commodore 64, using 8×8 bitmap fonts wit
 - Offline table generation in Python
 - Runtime rendering on C64 in 6502 assembly (ACME)
 
-## Scope (v2 - Future: IME)
+## Scope v1.5 (Current: multiple charsets)
+
+- Dual charset support (512 character slots) using raster IRQ
+- 8×7 pixel bitmap font (7 bytes per glyph) to save space
+
+## Scope v2 (Future: IME)
 
 - Pinyin input method with candidate selection
 - Interactive text editing
 - Cursor movement and scrolling
-- Dual charset support (512 character slots)
 - See "Future Work" section below
 
 ## Core Architecture (v1)
@@ -62,12 +66,12 @@ All are:
 
 ### Glyph Storage
 
-**font8.bin**
+**font8.bin** or **font7.bin** (for v1.5)
 
 Layout:
 
-- glyphID × 8 bytes
-- 1 byte per row, 8 bits used (8×8 bitmap)
+- glyphID × 8 bytes (or 7 bytes for v1.5)
+- 1 byte per row, 8 bits used: 8×8 bitmap (or 8×7 for v1.5)
 
 ## glyphID Ordering (Important)
 
@@ -122,7 +126,7 @@ Referenced by pointer tables `gb_row_ptr_lo` and `gb_row_ptr_hi` in main.asm.
 
 ## Character Cache
 
-**cache** (2502 bytes in main.asm)
+**cache** (2501+ bytes in main.asm)
 
 - Indexed by glyphID (0..2501)
 - Stores character slot (0-255) if glyph is loaded, or 0 if not cached
@@ -140,6 +144,7 @@ This limits visible unique characters to 256 at once, but allows documents with 
 **Outputs:**
 
 - `font8.bin` (2501 × 8 bytes)
+- `font7.bin` (2501 × 7 bytes for v1.5)
 - `gb40_rows.asm` (40 row tables with rank encoding)
 
 All tables are included in assembly using `!binary` and `!source`.
