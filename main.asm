@@ -522,6 +522,15 @@ FONT8_BASE	!byte 0,0,0,0,0,0,0,0	; 0=space
 
 		!binary "font8.bin"	; 5..2505
 
+		!byte %00000000		; 2505=em dash (a1aa) —
+		!byte %00000000
+		!byte %00000000
+		!byte %11111111
+		!byte %00000000
+		!byte %00000000
+		!byte %00000000
+		!byte %00000000
+
 ; ------------------------------------------------------------
 ; Sparse character lookup table
 ; - Manual entries (rows < $B0): not in tilemap, defined here
@@ -531,6 +540,8 @@ FONT8_BASE	!byte 0,0,0,0,0,0,0,0	; 0=space
 gb_sparse_table:
 	!byte $A1,$A3  ; 。(period)
 	!word 1
+	!byte $A1,$AA  ; — (em dash)
+	!word 2505
 	!byte $A3,$A1  ; ！(exclamation mark)
 	!word 2
 	!byte $A3,$AC  ; ，(comma)
@@ -544,6 +555,6 @@ col40:	!byte 40		; columns remaining until wrap (40..1)
 current_row: !byte 0		; current screen row (0-24)
 next_char: !byte 1		; next char in charset; 0 = space, so start at 1
 
-CACHE_SIZE = 5+2501
+CACHE_SIZE = 6+2501
 cache1 = *			; glyphID -> cache1 slot mapping (right after program)
 cache2 = $C000			; glyphID -> cache2 slot mapping
