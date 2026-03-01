@@ -498,10 +498,10 @@ FONT7_BASE	!byte 0,0,0,0,0,0,0	; 0=space
 		!byte %00000000		; 1=period (a1a3) 。
 		!byte %00000000
 		!byte %00000000
+		!byte %00000000
 		!byte %00100000
 		!byte %01010000
 		!byte %00100000
-		!byte %00000000
 
 		!byte %01000000		; 2=exclamation mark (a3a1) ！
 		!byte %01000000
@@ -514,10 +514,10 @@ FONT7_BASE	!byte 0,0,0,0,0,0,0	; 0=space
 		!byte %00000000		; 3=comma (a3ac) ，
 		!byte %00000000
 		!byte %00000000
+		!byte %00000000
 		!byte %00100000
 		!byte %00100000
 		!byte %01000000
-		!byte %00000000
 
 		!byte %01100000		; 4=question mark (a3bf) ？
 		!byte %10010000
@@ -529,15 +529,15 @@ FONT7_BASE	!byte 0,0,0,0,0,0,0	; 0=space
 
 		!binary "font7.bin"	; 5..2505
 
-		!byte %00000000		; 2505=em dash (a1aa) —
+		!byte %00000000		; 2506=em dash (a1aa) —
+		!byte %00000000
 		!byte %00000000
 		!byte %11111111
 		!byte %00000000
 		!byte %00000000
 		!byte %00000000
-		!byte %00000000
 
-		!byte %00000000		; 2506=ellipsis (a1ad) …
+		!byte %00000000		; 2507=ellipsis (a1ad) …
 		!byte %00000000
 		!byte %00000000
 		!byte %00000000
@@ -545,23 +545,23 @@ FONT7_BASE	!byte 0,0,0,0,0,0,0	; 0=space
 		!byte %01010100
 		!byte %00000000
 
-		!byte %00000000		; 2507=left double quote (a1b0) \u201c
-		!byte %01010000
-		!byte %10100000
+		!byte %00010010		; 2508=left double quote (a1b0) “ U+201c
+		!byte %00100100
+		!byte %00100100
 		!byte %00000000
 		!byte %00000000
 		!byte %00000000
 		!byte %00000000
 
-		!byte %00000000		; 2508=right double quote (a1b1) \u201d
+		!byte %01001000		; 2509=right double quote (a1b1) ” U+201d
+		!byte %01001000
+		!byte %10010000
 		!byte %00000000
 		!byte %00000000
-		!byte %01010000
-		!byte %00101000
 		!byte %00000000
 		!byte %00000000
 
-		!byte %00000000		; 2509=fullwidth colon (a3ba) ：
+		!byte %00000000		; 2510=fullwidth colon (a3ba) ：
 		!byte %00100000
 		!byte %00000000
 		!byte %00000000
@@ -569,13 +569,13 @@ FONT7_BASE	!byte 0,0,0,0,0,0,0	; 0=space
 		!byte %00000000
 		!byte %00000000
 
-		!byte %00000000		; 2510=fullwidth semicolon (a3bb) ；
+		!byte %00000000		; 2511=fullwidth semicolon (a3bb) ；
 		!byte %00100000
 		!byte %00000000
 		!byte %00000000
+		!byte %00100000
 		!byte %00100000
 		!byte %01000000
-		!byte %00000000
 
 ; ------------------------------------------------------------
 ; Sparse character lookup table
@@ -587,21 +587,21 @@ gb_sparse_table:
 	!byte $A1,$A3  ; 。(period)
 	!word 1
 	!byte $A1,$AA  ; — (em dash)
-	!word 2505
-	!byte $A1,$AD  ; … (ellipsis)
 	!word 2506
-	!byte $A1,$B0  ; " (left double quote)
+	!byte $A1,$AD  ; … (ellipsis)
 	!word 2507
-	!byte $A1,$B1  ; " (right double quote)
+	!byte $A1,$B0  ; “ (left double quote)
 	!word 2508
+	!byte $A1,$B1  ; ” (right double quote)
+	!word 2509
 	!byte $A3,$A1  ; ！(exclamation mark)
 	!word 2
 	!byte $A3,$AC  ; ，(comma)
 	!word 3
 	!byte $A3,$BA  ; ：(fullwidth colon)
-	!word 2509
-	!byte $A3,$BB  ; ；(fullwidth semicolon)
 	!word 2510
+	!byte $A3,$BB  ; ；(fullwidth semicolon)
+	!word 2511
 	!byte $A3,$BF  ; ？(question mark)
 	!word 4
 	; Generated entries appended here, terminated by $00
