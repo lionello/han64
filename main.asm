@@ -27,7 +27,7 @@ msgptr	= $FD			; Pointer into msg: $FD/$FE
 tmp1	= $02
 tmp2	= $FF
 
-CHARSET_SWITCH_ROW = 12		; Rows 0-11: charset1, rows 12-24: charset2
+CHARSET_SWITCH_ROW = 13		; Initia: rows 0-12 charset1, rows 13-24 charset2
 
 ; Start of actual program
 * = $0810
@@ -35,6 +35,11 @@ CHARSET_SWITCH_ROW = 12		; Rows 0-11: charset1, rows 12-24: charset2
 _start
 	sei
 	cld
+
+; Bank out BASIC ROM at $A000-$BFFF so screen RAM there is readable
+; ($01 = $36: LORAM=0, HIRAM=1 keep KERNAL, CHAREN=1 keep I/O)
+	lda #$36
+	sta $01
 
 ; Change the VIC bank to Bank2: $8000-$BFFF
 	lda CIA_VICBANK
@@ -92,8 +97,9 @@ _start
 	lda #$7F
 	sta $DC0D		; disable all CIA1 interrupts
 	lda $DC0D		; acknowledge any pending
-	lda #(50 + CHARSET_SWITCH_ROW * 8)  ; raster line for row 12
+	lda #(50 + CHARSET_SWITCH_ROW * 8)  ; raster line for switch row
 	sta $D012
+	sta irq_switch_line	; store for IRQ handler
 	lda $D011
 	and #$7F		; clear bit 7 for lines < 256
 	sta $D011
@@ -114,8 +120,11 @@ _start
 .loop
 	jsr ReadChar
 	cmp #$0A		; newline?
-	beq .newline
-	bcc .done		; non-printables
+	bne +
+	jmp .newline
++	bcs +			; >= $0A, printable
+	jmp .text_end		; null terminator / non-printables
++
 
 	jsr GB2312_LookupGlyphID
 	; A = glyph lo, X = glyph hi, C=1 if found
@@ -123,29 +132,43 @@ _start
 
 	sta tmp1		; save glyphID-lo
 	stx tmp2		; save glyphID-hi
-	; Choose cache based on current row
-	ldy current_row
-	cpy #CHARSET_SWITCH_ROW
-	bcs .check_cache2
-
+	; B region: switch_row <= current_row < switch_row+13
+	; A (above) and C (below) both render into TOP charset
+	lda current_row
+	sec
+	sbc switch_row
+	bcc .top_region		; current_row < switch_row → A region (TOP)
+	cmp #13
+	bcc .bot_region		; current_row - switch_row < 13 → B region (BOT)
+.top_region:			; C region falls through here too
+top_charset_val = *+1
+	lda #>CHARSET1_BASE/8	; patched on swap
+	sta charset_bank
+	lda tmp1
+	clc			; for adc below
 .check_cache1:
-	; Check if glyph A/X is in cache1
-	;clc			; should be clear from previous bcs
-	adc #<cache1
-	sta tmpptr		; tmpptr-lo = glyphID-lo + cache1-lo
+top_cache_lo = *+1
+	adc #<cache1		; patched on swap
+	sta tmpptr
 	txa
-	adc #>cache1
-	sta tmpptr+1		; tmpptr-hi = glyphID-hi + cache1-hi + carry
+top_cache_hi = *+1
+	adc #>cache1		; patched on swap
+	sta tmpptr+1
 	jmp +
 
+.bot_region:
+	lda bot_charset_val
+	sta charset_bank
+	lda tmp1
 .check_cache2:
-	; Check if glyph A/X is in cache2
 	clc
-	adc #<cache2
-	sta tmpptr		; tmpptr-lo = glyphID-lo + cache2-lo
+bot_cache_lo = *+1
+	adc #<cache2		; patched on swap
+	sta tmpptr
 	txa
-	adc #>cache2
-	sta tmpptr+1		; tmpptr-hi = glyphID-hi + cache2-hi + carry
+bot_cache_hi = *+1
+	adc #>cache2		; patched on swap
+	sta tmpptr+1
 
 +	ldy #0
 	lda (tmpptr),y
@@ -172,9 +195,34 @@ _start
 
 -	lda current_row
 	cmp #25
-	bmi .loop
+	bcc .loop		; < 25, keep rendering
 
-.done   jmp .done		; Sit in an infinite loop
+	; Screen full — wait for user to scroll
+	lda text_done
+	bne .done		; no more text to display
+	jsr WaitForSpace
+	jsr ScrollScreen
+	jsr AdjustSwitchRow
+
+	; Set up to render into row 24
+	lda #24
+	sta current_row
+	lda #<(SCREEN_BASE + 24*40)
+	sta scr_lo
+	lda #>(SCREEN_BASE + 24*40)
+	sta scr_hi
+	lda #40
+	sta col40
+	jmp .loop
+
+.done	jmp .done		; Sit in an infinite loop
+
+.text_end:
+	lda #1
+	sta text_done
+	lda #25
+	sta current_row		; force screen-full state
+	jmp -			; go to scroll check → .done
 
 .newline:
 	jsr PrintNewLine
@@ -216,11 +264,14 @@ PrintNewLine:
 	inc current_row		; advance to next row
 
 	lda current_row
-	cmp #CHARSET_SWITCH_ROW
+	cmp #25
+	bcs +			; off-screen, skip charset check
+	cmp switch_row
 	beq .select_charset2
-	rts
++	rts
 
 .select_charset2:
+bot_charset_val = *+1
 	lda #>CHARSET2_BASE/8
 	sta charset_bank
 	;jmp InitCharset fall-through
@@ -277,31 +328,143 @@ ReadChar:
 +	rts
 
 ; ------------------------------------------------------------
-; Raster IRQ - Switch charset at row 12
+; Wait for SPACE key press and release
+; ------------------------------------------------------------
+WaitForSpace:
+	lda #%01111111		; select keyboard row 7
+	sta $DC00
+-	lda $DC01
+	and #%00010000		; bit 4 = SPACE
+	bne -			; loop while not pressed
+-	lda $DC01
+	and #%00010000
+	beq -			; loop while held
+	rts
+
+; ------------------------------------------------------------
+; Scroll screen up by one row (40 bytes)
+; Copy rows 1-24 to rows 0-23, clear row 24
+; ------------------------------------------------------------
+ScrollScreen:
+	ldx #0
+-	lda SCREEN_BASE+40,x
+	sta SCREEN_BASE,x
+	inx
+	bne -
+-	lda SCREEN_BASE+$100+40,x
+	sta SCREEN_BASE+$100,x
+	inx
+	bne -
+-	lda SCREEN_BASE+$200+40,x
+	sta SCREEN_BASE+$200,x
+	inx
+	bne -
+-	lda SCREEN_BASE+$300+40,x
+	sta SCREEN_BASE+$300,x
+	inx
+	cpx #(1000-768-40)	; 192
+	bne -
+	; Clear row 24 to slot 0 (space)
+	lda #0
+	ldx #39
+-	sta SCREEN_BASE+24*40,x
+	dex
+	bpl -
+	rts
+
+; ------------------------------------------------------------
+; Adjust charset switch row after scroll
+; Decrements switch_row, swaps charsets if it reaches 0
+; ------------------------------------------------------------
+AdjustSwitchRow:
+	dec switch_row
+	bne .update_irq
+	; switch_row = 0: swap charset roles
+	jmp SwapCharsets
+.update_irq:
+	; Compute raster line = 50 + switch_row * 8
+	lda switch_row
+	asl
+	asl
+	asl
+	clc
+	adc #50
+	sta irq_switch_line
+	sta $D012
+	rts
+
+; ------------------------------------------------------------
+; Swap charset roles when switch_row reaches 0
+; Visual boundary stays at row 13: pre-swap rows 0-12 were B (BOT),
+; rows 13-24 were C (TOP). Post-swap they become A (TOP) and B (BOT)
+; respectively, which lines up because TOP/BOT roles flip too.
+; ------------------------------------------------------------
+SwapCharsets:
+	; Swap IRQ charset bits
+	lda irq_top_bits
+	ldx irq_bot_bits
+	sta irq_bot_bits
+	stx irq_top_bits
+
+	; Swap cache pointers
+	lda top_cache_lo
+	ldx bot_cache_lo
+	sta bot_cache_lo
+	stx top_cache_lo
+	lda top_cache_hi
+	ldx bot_cache_hi
+	sta bot_cache_hi
+	stx top_cache_hi
+
+	; Swap charset bank values (TOP/BOT roles flip)
+	lda top_charset_val
+	ldx bot_charset_val
+	sta bot_charset_val
+	stx top_charset_val
+
+	; Set switch_row = 13: A=rows 0-12, B=rows 13-24, C=empty
+	lda #CHARSET_SWITCH_ROW
+	sta switch_row
+	; IRQ at raster line 50 + 13*8 = 154
+	lda #(50 + CHARSET_SWITCH_ROW * 8)
+	sta irq_switch_line
+	sta $D012
+	rts
+
+; ------------------------------------------------------------
+; Raster IRQ - Two switches per frame: TOP→BOT at switch_row, BOT→TOP 13 rows later
 ; ------------------------------------------------------------
 RasterIRQ:
 	lda #$01
 	sta $D019		; acknowledge raster interrupt
 
 	lda $D012
-	cmp #(50 + CHARSET_SWITCH_ROW * 8)
+irq_switch_line = *+1
+	cmp #(50 + CHARSET_SWITCH_ROW * 8)  ; patched
 	bne .switch_back
 
-.switch_to_charset2:
+.switch_to_bot:
 	lda VIC_MEMORY
 	and #%11110001		; clear charset bits
-	ora #(CHARSET2_BANK*2)	; set charset2
+irq_bot_bits = *+1
+	ora #CHARSET2_BANK*2	; patched on swap
 	sta VIC_MEMORY
-	lda #250		; next IRQ near end of screen
-	jmp +
+	; second IRQ = irq_switch_line + 13 rows (104 lines), clamped to 250
+	lda irq_switch_line
+	clc
+	adc #13*8
+	bcc +
+	lda #250		; clamp to end of visible area
++	jmp ++
 
 .switch_back:
 	lda VIC_MEMORY
 	and #%11110001		; clear charset bits
-	ora #CHARSET1_BANK*2	; set charset1
+irq_top_bits = *+1
+	ora #CHARSET1_BANK*2	; patched on swap
 	sta VIC_MEMORY
-	lda #(50 + CHARSET_SWITCH_ROW * 8)
-+	sta $D012
+	lda irq_switch_line
+++	sta $D012
 	jmp $EA81		; KERNAL register restore + rti
 
 ; ------------------------------------------------------------
@@ -607,9 +770,11 @@ gb_sparse_table:
 	; Generated entries appended here, terminated by $00
 !source "gb40_rows.asm"
 
-col40:	!byte 40		; columns remaining until wrap (40..1)
-current_row: !byte 0		; current screen row (0-24)
-next_char: !byte 1		; next char in charset; 0 = space, so start at 1
+col40:		!byte 40	; columns remaining until wrap (40..1)
+current_row:	!byte 0		; current screen row (0-24)
+next_char:	!byte 1		; next char in charset; 0 = space, so start at 1
+switch_row:	!byte CHARSET_SWITCH_ROW
+text_done:	!byte 0		; 1 = no more text to render
 
 CACHE_SIZE = 11+2501
 cache1 = *			; glyphID -> cache1 slot mapping (right after program)
