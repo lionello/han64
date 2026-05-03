@@ -29,6 +29,9 @@ tmp2	= $FF
 
 CHARSET_SWITCH_ROW = 13		; Initia: rows 0-12 charset1, rows 13-24 charset2
 
+DEFAULT_COLOR	= $0E		; light blue
+CURSOR_COLOR	= $01		; white
+
 ; Start of actual program
 * = $0810
 
@@ -57,13 +60,13 @@ _start
 	inx
 	bne -
 
-; Set all colors to light gray
-;	lda #$0F
+; Set all colors to light gray (cursor will overwrite one cell with white)
+;	lda #DEFAULT_COLOR
 ;	ldx #$00
-;-	sta COLOR_BASE$000,x
-;	sta COLOR_BASE$100,x
-;	sta COLOR_BASE$200,x
-;	sta COLOR_BASE$2E8,x
+;-	sta COLOR_BASE+$000,x
+;	sta COLOR_BASE+$100,x
+;	sta COLOR_BASE+$200,x
+;	sta COLOR_BASE+$2E8,x
 ;	inx
 ;	bne -
 
@@ -197,10 +200,10 @@ bot_cache_hi = *+1
 	cmp #25
 	bcc .loop		; < 25, keep rendering
 
-	; Screen full — wait for user to scroll
+	; Screen full — cursor loop, returns when DOWN pressed at row 24
 	lda text_done
 	bne .done		; no more text to display
-	jsr WaitForSpace
+	jsr CursorLoop
 	jsr ScrollScreen
 	jsr AdjustSwitchRow
 
@@ -328,17 +331,100 @@ ReadChar:
 +	rts
 
 ; ------------------------------------------------------------
-; Wait for SPACE key press and release
+; Cursor input loop. Draws cursor, polls keys, returns on DOWN at row 24.
+; UP/DOWN/LEFT/RIGHT clamp at edges; DOWN at row 24 = scroll request.
 ; ------------------------------------------------------------
-WaitForSpace:
-	lda #%01111111		; select keyboard row 7
-	sta $DC00
--	lda $DC01
-	and #%00010000		; bit 4 = SPACE
-	bne -			; loop while not pressed
--	lda $DC01
-	and #%00010000
-	beq -			; loop while held
+KEY_DOWN	= 1
+KEY_UP		= 2
+KEY_LEFT	= 3
+KEY_RIGHT	= 4
+
+CursorLoop:
+.poll
+	jsr DrawCursor
+	jsr WaitForCursorKey	; A = key code
+	pha			; preserve key code across EraseCursor
+	jsr EraseCursor
+	pla
+	cmp #KEY_DOWN
+	beq .down
+	cmp #KEY_UP
+	beq .up
+	cmp #KEY_LEFT
+	beq .left
+	; KEY_RIGHT (only remaining option from WaitForCursorKey)
+.right
+	lda cursor_col
+	cmp #39
+	bcs .poll
+	inc cursor_col
+	jmp .poll
+.up
+	lda cursor_row
+	beq .poll
+	dec cursor_row
+	jmp .poll
+.left
+	lda cursor_col
+	beq .poll
+	dec cursor_col
+	jmp .poll
+.down
+	lda cursor_row
+	cmp #24
+	bcs .scroll_request	; row 24, request scroll
+	inc cursor_row
+	jmp .poll
+.scroll_request
+	rts
+
+; ------------------------------------------------------------
+; Set color RAM at (cursor_row, cursor_col)
+; DrawCursor: write CURSOR_COLOR; EraseCursor: write DEFAULT_COLOR
+; CLOBBERS: A, X, Y, tmpptr
+; ------------------------------------------------------------
+DrawCursor:
+	lda #CURSOR_COLOR
+	!byte $2C		; BIT abs - skip next 2 bytes
+EraseCursor:
+	lda #DEFAULT_COLOR
+	pha
+	ldx cursor_row
+	lda row_offset_lo,x
+	clc
+	adc cursor_col
+	sta tmpptr
+	lda row_offset_hi,x
+	adc #>COLOR_BASE	; carry from low add
+	sta tmpptr+1
+	pla
+	ldy #0
+	sta (tmpptr),y
+	rts
+
+; ------------------------------------------------------------
+; Wait for a cursor key from the KERNAL keyboard buffer.
+; Uses GETIN ($FFE4); SCNKEY runs in our raster IRQ and fills the buffer.
+; Returns A = key code (1..4). Non-cursor keys are discarded.
+; ------------------------------------------------------------
+WaitForCursorKey:
+-	jsr $FFE4		; GETIN → A = PETSCII code, 0 if buffer empty
+	cmp #$11		; CRSR DOWN
+	beq .k_down
+	cmp #$91		; CRSR UP (shift+down)
+	beq .k_up
+	cmp #$1D		; CRSR RIGHT
+	beq .k_right
+	cmp #$9D		; CRSR LEFT (shift+right)
+	beq .k_left
+	bne -			; ignore other keys (incl. 0 = no key)
+.k_down	lda #KEY_DOWN
+	rts
+.k_up	lda #KEY_UP
+	rts
+.k_left	lda #KEY_LEFT
+	rts
+.k_right lda #KEY_RIGHT
 	rts
 
 ; ------------------------------------------------------------
@@ -465,6 +551,7 @@ irq_top_bits = *+1
 	sta VIC_MEMORY
 	lda irq_switch_line
 ++	sta $D012
+	jsr $FF9F		; SCNKEY: scan keyboard, fill kbd buffer
 	jmp $EA81		; KERNAL register restore + rti
 
 ; ------------------------------------------------------------
@@ -775,6 +862,20 @@ current_row:	!byte 0		; current screen row (0-24)
 next_char:	!byte 1		; next char in charset; 0 = space, so start at 1
 switch_row:	!byte CHARSET_SWITCH_ROW
 text_done:	!byte 0		; 1 = no more text to render
+cursor_row:	!byte 0		; cursor starts at top-left
+cursor_col:	!byte 0
+
+; row*40 = color RAM offset within a 25*40 grid
+row_offset_lo:
+	!byte 0, 40, 80, 120, 160, 200, 240
+	!byte 24, 64, 104, 144, 184, 224
+	!byte 8, 48, 88, 128, 168, 208, 248
+	!byte 32, 72, 112, 152, 192
+row_offset_hi:
+	!byte 0, 0, 0, 0, 0, 0, 0
+	!byte 1, 1, 1, 1, 1, 1
+	!byte 2, 2, 2, 2, 2, 2, 2
+	!byte 3, 3, 3, 3, 3
 
 CACHE_SIZE = 11+2501
 cache1 = *			; glyphID -> cache1 slot mapping (right after program)
