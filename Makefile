@@ -4,7 +4,7 @@ EMU  ?= x64sc
 TARGET := viewer.prg
 SRC    := main.asm
 
-.PHONY: all run clean
+.PHONY: all run clean test
 
 all: $(TARGET)
 
@@ -12,7 +12,10 @@ $(TARGET): $(SRC) chabuduo.bin gb40_rows.asm font8.bin
 	$(ACME) -f cbm -o $@ $<
 
 run: $(TARGET)
-	$(EMU) -autostart $(TARGET)
+	$(EMU) -autostart $(TARGET) -autostart-warp -remotemonitor
+
+test: $(TARGET)
+	$(EMU) -autostart $(TARGET) -warp -exitscreenshot test.png -limitcycles 70000000
 
 clean:
 	rm $(TARGET)
