@@ -2,7 +2,7 @@
 
 A GB2312 Chinese text renderer for the Commodore 64, using 8×8 bitmap fonts with dynamic character caching.
 
-![Chabuduo rendered on C64](chabuduo.png)
+![Chabuduo rendered on C64](han64%20scrolling.gif)
 
 ## Scope v1 (Rendering)
 
