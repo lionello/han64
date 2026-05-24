@@ -4,6 +4,13 @@ A GB2312 Chinese text renderer for the Commodore 64, using 8×8 bitmap fonts wit
 
 ![Chabuduo rendered on C64](han64%20scrolling.gif)
 
+## Run
+
+The `run` target in `Makefile` is hooked up to run VICE:
+```sh
+make run
+```
+
 ## Scope v1 (Rendering)
 
 - 2501+ Simplified Chinese characters (GB2312 rows $B0-$D7)
